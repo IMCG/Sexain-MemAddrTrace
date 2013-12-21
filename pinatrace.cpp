@@ -90,6 +90,13 @@ VOID Fini(INT32 code, VOID *v)
     fclose(trace);
 }
 
+/* Added command line option: buffer size */
+KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
+    "bs", "1048576", "specify the number of records to buffer");
+
+KNOB<string> KnobTraceFile(KNOB_MODE_WRITEONCE, "pintool",
+    "o", "mem_addr.trace", "specify output file name");
+
 /* ===================================================================== */
 /* Print Help Message                                                    */
 /* ===================================================================== */
@@ -109,8 +116,8 @@ int main(int argc, char *argv[])
 {
     if (PIN_Init(argc, argv)) return Usage();
 
-    trace = fopen("pinatrace.out", "w");
-    mem_trace = new MemAddrTrace(1024 * 1024, trace);
+    trace = fopen(KnobTraceFile.Value().c_str(), "w");
+    mem_trace = new MemAddrTrace(KnobBufferSize.Value(), trace);
 
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
