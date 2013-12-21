@@ -34,26 +34,19 @@ END_LEGAL */
 
 #include <stdio.h>
 #include "pin.H"
+#include "mem_addr_trace.h"
 
 FILE * trace;
+MemAddrTrace * mem_trace;
 
-struct MemRecord {
-    char op;
-    VOID *addr;
-};
-
-VOID RecordMemRead(VOID * ip, VOID * addr)
+VOID RecordMemRead(UINT64 time, VOID * addr)
 {
-    struct MemRecord rec = { 'R', addr };
-    fwrite(&rec, sizeof(rec), 1, trace);
-    //fprintf(trace,"%p: R %p\n", ip, addr);
+    mem_trace->Input(time, addr, 'R');
 }
 
-VOID RecordMemWrite(VOID * ip, VOID * addr)
+VOID RecordMemWrite(UINT64 time, VOID * addr)
 {
-    struct MemRecord rec = { 'W', addr };
-    fwrite(&rec, sizeof(rec), 1, trace);
-    //fprintf(trace,"%p: W %p\n", ip, addr);
+    mem_trace->Input(time, addr, 'W');
 }
 
 // Is called for every instruction and instruments reads and writes
@@ -73,7 +66,7 @@ VOID Instruction(INS ins, VOID *v)
         {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
-                IARG_INST_PTR,
+                IARG_TSC,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_END);
         }
@@ -84,7 +77,7 @@ VOID Instruction(INS ins, VOID *v)
         {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
-                IARG_INST_PTR,
+                IARG_TSC,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_END);
         }
@@ -93,6 +86,7 @@ VOID Instruction(INS ins, VOID *v)
 
 VOID Fini(INT32 code, VOID *v)
 {
+    delete mem_trace;
     fclose(trace);
 }
 
@@ -116,6 +110,7 @@ int main(int argc, char *argv[])
     if (PIN_Init(argc, argv)) return Usage();
 
     trace = fopen("pinatrace.out", "w");
+    mem_trace = new MemAddrTrace(1024 * 1024, trace);
 
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
