@@ -33,11 +33,15 @@ END_LEGAL */
  */
 
 #include <stdio.h>
+#include <atomic>
 #include "pin.H"
 #include "mem_addr_trace.h"
 
 FILE * trace;
+std::atomic_uint ins_count;
 MemAddrTrace * mem_trace;
+
+VOID InsCount() { ++ins_count; }
 
 VOID RecordMemRead(UINT64 time, VOID * addr)
 {
@@ -52,6 +56,11 @@ VOID RecordMemWrite(UINT64 time, VOID * addr)
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
+    INS_InsertCall(
+        ins, IPOINT_BEFORE, (AFUNPTR)InsCount,
+        IARG_CALL_ORDER, CALL_ORDER_FIRST,
+        IARG_END);
+
     // Instruments memory accesses using a predicated call, i.e.
     // the instrumentation is called iff the instruction will actually be executed.
     //
