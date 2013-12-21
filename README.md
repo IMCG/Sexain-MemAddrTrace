@@ -5,4 +5,6 @@ A simple but optimized Pin tool (Pintool) to collect memory access trace. Record
 
 Usage
 
-make PIN_ROOT=<path to Pin kit> obj-intel64/MemAddrTrace.so
+```
+$ make PIN_ROOT=<path to Pin kit> obj-intel64/MemAddrTrace.so
+```
