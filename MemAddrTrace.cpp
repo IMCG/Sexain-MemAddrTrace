@@ -46,11 +46,11 @@ static std::atomic_uint g_ins_count;
 static TLS_KEY tls_ins_count;
 
 #define TLS_INS_COUNT(tid) \
-    (static_cast<INT32*>(PIN_GetThreadData(tls_ins_count, tid)))
+    (static_cast<UINT32*>(PIN_GetThreadData(tls_ins_count, tid)))
 
 VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
-    INT32* tdata = new INT32;
+    UINT32* tdata = new UINT32;
     PIN_SetThreadData(tls_ins_count, tdata, tid);
 }
 
@@ -64,14 +64,14 @@ VOID InsCount(THREADID tid)
     *TLS_INS_COUNT(tid) = ++g_ins_count;
 }
 
-VOID RecordMemRead(UINT64 time, VOID * addr)
+VOID RecordMemRead(THREADID tid, VOID * addr)
 {
-    mem_trace->Input(time, addr, 'R');
+    mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'R');
 }
 
-VOID RecordMemWrite(UINT64 time, VOID * addr)
+VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
-    mem_trace->Input(time, addr, 'W');
+    mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'W');
 }
 
 // Is called for every instruction and instruments reads and writes
@@ -96,7 +96,7 @@ VOID Instruction(INS ins, VOID *v)
         {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
-                IARG_TSC,
+                IARG_THREAD_ID,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_END);
         }
@@ -107,7 +107,7 @@ VOID Instruction(INS ins, VOID *v)
         {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
-                IARG_TSC,
+                IARG_THREAD_ID,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_END);
         }
@@ -116,6 +116,7 @@ VOID Instruction(INS ins, VOID *v)
 
 VOID Fini(INT32 code, VOID *v)
 {
+    mem_trace->Flush();
     delete mem_trace;
     fclose(trace);
 }

@@ -73,3 +73,7 @@ TOOL_CXXFLAGS += -std=c++0x
 
 # This section contains the build rules for all binaries that have special build rules.
 # See makefile.default.rules for the default build rules.
+
+$(OBJDIR)MemAddrTrace$(OBJ_SUFFIX): MemAddrTrace.cpp mem_addr_trace.h
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
