@@ -2,6 +2,7 @@
 Intel Open Source License 
 
 Copyright (c) 2002-2013 Intel Corporation. All rights reserved.
+Copyright (c) 2013 Jinglei Ren <jinglei.ren@gmail.com>
  
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -30,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 END_LEGAL */
 /*
  *  This file contains an ISA-portable PIN tool for tracing memory accesses.
+ *  Create Date: 12/20/2013
  */
 
 #include <stdio.h>
@@ -37,11 +39,30 @@ END_LEGAL */
 #include "pin.H"
 #include "mem_addr_trace.h"
 
-FILE * trace;
-std::atomic_uint ins_count;
-MemAddrTrace * mem_trace;
+static FILE * trace;
+static MemAddrTrace * mem_trace;
 
-VOID InsCount() { ++ins_count; }
+static std::atomic_uint g_ins_count;
+static TLS_KEY tls_ins_count;
+
+#define TLS_INS_COUNT(tid) \
+    (static_cast<INT32*>(PIN_GetThreadData(tls_ins_count, tid)))
+
+VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
+{
+    INT32* tdata = new INT32;
+    PIN_SetThreadData(tls_ins_count, tdata, tid);
+}
+
+VOID ThreadFini(THREADID tid, const CONTEXT *ctxt, INT32 flags, VOID *v)
+{
+    delete TLS_INS_COUNT(tid);
+}
+
+VOID InsCount(THREADID tid)
+{
+    *TLS_INS_COUNT(tid) = ++g_ins_count;
+}
 
 VOID RecordMemRead(UINT64 time, VOID * addr)
 {
@@ -57,7 +78,7 @@ VOID RecordMemWrite(UINT64 time, VOID * addr)
 VOID Instruction(INS ins, VOID *v)
 {
     INS_InsertCall(
-        ins, IPOINT_BEFORE, (AFUNPTR)InsCount,
+        ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_THREAD_ID,
         IARG_CALL_ORDER, CALL_ORDER_FIRST,
         IARG_END);
 
@@ -128,6 +149,8 @@ int main(int argc, char *argv[])
     trace = fopen(KnobTraceFile.Value().c_str(), "w");
     mem_trace = new MemAddrTrace(KnobBufferSize.Value(), trace);
 
+    PIN_AddThreadStartFunction(ThreadStart, 0);
+    PIN_AddThreadFiniFunction(ThreadFini, 0);
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
 
