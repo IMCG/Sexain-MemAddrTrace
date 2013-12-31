@@ -10,22 +10,26 @@
 
 class MemAddrTrace {
  public:
-  MemAddrTrace(int buf_size, FILE* file); 
+  MemAddrTrace(UINT32 buf_size, FILE* file, UINT32 file_size_mb); 
   ~MemAddrTrace();
  
   void Input(UINT32 ins_seq, VOID* addr, char op);
   void Flush();
 
-  int buffer_size() const { return buffer_size_; }
+  UINT32 buffer_size() const { return buffer_size_; }
   FILE* file() const { return file_; }
 
- private:
-  void Output(unsigned int end);
+  UINT64 file_size() const { return file_size_; }
+  void set_file_size(UINT32 mb) { file_size_ = (UINT64)mb << 20; }
 
-  const unsigned int buffer_size_;
+ private:
+  void DoFlush();
+
+  const UINT32 buffer_size_;
   FILE* file_;
+  UINT64 file_size_; // max file size
   PIN_LOCK lock_;
-  unsigned int end_;
+  UINT32 end_;
   UINT32* ins_array_;
   VOID** addr_array_;
   char* op_array_;
@@ -34,8 +38,9 @@ class MemAddrTrace {
   char* op_compressed_;
 };
 
-MemAddrTrace::MemAddrTrace(int buf_size, FILE* file):
+MemAddrTrace::MemAddrTrace(UINT32 buf_size, FILE* file, UINT32 file_size_mb):
     buffer_size_(buf_size), file_(file), end_(0) {
+  set_file_size(file_size_mb);
   PIN_InitLock(&lock_);
   ins_array_ = new UINT32[buffer_size_];
   addr_array_ = new VOID*[buffer_size_];
@@ -56,22 +61,24 @@ MemAddrTrace::~MemAddrTrace() {
 }
 
 // Should be protected by lock_
-void MemAddrTrace::Output(unsigned int end) {
-  if (end > buffer_size_) {
+void MemAddrTrace::DoFlush() {
+  if (end_ > buffer_size_) {
     fprintf(stderr, "[Warn] MemAddrTrace::Output receives overflowed end: %d\n",
-      end);
-    end = end_;
+      end_);
+    end_ = buffer_size_;
   }
-  fwrite(ins_array_, sizeof(UINT32), end, file_);
-  fwrite(addr_array_, sizeof(VOID*), end, file_);
-  fwrite(op_array_, sizeof(char), end, file_);
+  if ((UINT64)ftell(file_) < file_size_) {
+    fwrite(ins_array_, sizeof(UINT32), end_, file_);
+    fwrite(addr_array_, sizeof(VOID*), end_, file_);
+    fwrite(op_array_, sizeof(char), end_, file_);
+  }
   end_ = 0;
 }
 
 void MemAddrTrace::Input(UINT32 ins_seq, VOID* addr, char op) {
   PIN_GetLock(&lock_, 0);
   if (end_ == buffer_size_) {
-    Output(buffer_size_);
+    DoFlush();
   }
 
   ins_array_[end_] = ins_seq;
@@ -83,7 +90,7 @@ void MemAddrTrace::Input(UINT32 ins_seq, VOID* addr, char op) {
 
 void MemAddrTrace::Flush() {
   PIN_GetLock(&lock_, 0);
-  Output(end_);
+  DoFlush();
   PIN_ReleaseLock(&lock_);
 }
 

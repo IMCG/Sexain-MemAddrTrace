@@ -39,7 +39,6 @@ END_LEGAL */
 #include "pin.H"
 #include "mem_addr_trace.h"
 
-static FILE * trace;
 static MemAddrTrace * mem_trace;
 
 static std::atomic_uint g_ins_count;
@@ -114,19 +113,22 @@ VOID Instruction(INS ins, VOID *v)
     }
 }
 
-VOID Fini(INT32 code, VOID *v)
+VOID Fini(INT32 code, VOID *file)
 {
     mem_trace->Flush();
     delete mem_trace;
-    fclose(trace);
+    fclose((FILE*)file);
 }
 
 /* Added command line option: buffer size */
 KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
-    "bs", "1048576", "specify the number of records to buffer");
+    "buffer_size", "1048576", "specify the number of records to buffer");
 
 KNOB<string> KnobTraceFile(KNOB_MODE_WRITEONCE, "pintool",
     "o", "mem_addr.trace", "specify output file name");
+
+KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
+    "file_size", "16384", "specify the max file size in MB");
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -147,13 +149,14 @@ int main(int argc, char *argv[])
 {
     if (PIN_Init(argc, argv)) return Usage();
 
-    trace = fopen(KnobTraceFile.Value().c_str(), "w");
-    mem_trace = new MemAddrTrace(KnobBufferSize.Value(), trace);
+    FILE* file = fopen(KnobTraceFile.Value().c_str(), "wb");
+    UINT32 limit = KnobFileSize.Value();
+    mem_trace = new MemAddrTrace(KnobBufferSize.Value(), file, limit);
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
     INS_AddInstrumentFunction(Instruction, 0);
-    PIN_AddFiniFunction(Fini, 0);
+    PIN_AddFiniFunction(Fini, file);
 
     // Never returns
     PIN_StartProgram();
