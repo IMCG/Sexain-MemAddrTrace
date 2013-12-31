@@ -53,6 +53,7 @@ DLL_ROOTS :=
 LIB_ROOTS :=
 
 TOOL_CXXFLAGS += -std=c++0x
+TOOL_LIBS += -lz
 
 ##############################################################
 #
