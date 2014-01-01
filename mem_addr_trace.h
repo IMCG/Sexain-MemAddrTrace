@@ -11,7 +11,7 @@
 
 class MemAddrTrace {
  public:
-  MemAddrTrace(UINT32 buf_size, FILE* file, UINT32 file_size_mb); 
+  MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_size_mb); 
   ~MemAddrTrace();
  
   void Input(UINT32 ins_seq, VOID* addr, char op);
@@ -39,9 +39,15 @@ class MemAddrTrace {
   char* op_compressed_;
 };
 
-MemAddrTrace::MemAddrTrace(UINT32 buf_size, FILE* file, UINT32 file_size_mb):
-    buffer_size_(buf_size), file_(file), end_(0) {
-  set_file_size(file_size_mb);
+MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
+    buffer_size_(buf_size), end_(0) {
+  file_ = fopen(file, "wb");
+  fwrite(&buf_size, sizeof(buf_size), 1, file_);
+
+  UINT32 ptr_bits = sizeof(VOID*);
+  fwrite(&ptr_bits, sizeof(ptr_bits), 1, file_);
+
+  set_file_size(max_mb);
   PIN_InitLock(&lock_);
   ins_array_ = new UINT32[buffer_size_];
   addr_array_ = new VOID*[buffer_size_];
@@ -53,6 +59,7 @@ MemAddrTrace::MemAddrTrace(UINT32 buf_size, FILE* file, UINT32 file_size_mb):
 
 MemAddrTrace::~MemAddrTrace() {
   fflush(file_);
+  fclose(file_);
   delete ins_array_;
   delete addr_array_;
   delete op_array_;

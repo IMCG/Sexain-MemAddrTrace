@@ -113,11 +113,10 @@ VOID Instruction(INS ins, VOID *v)
     }
 }
 
-VOID Fini(INT32 code, VOID *file)
+VOID Fini(INT32 code, VOID *v)
 {
     mem_trace->Flush();
     delete mem_trace;
-    fclose((FILE*)file);
 }
 
 /* Added command line option: buffer size */
@@ -149,17 +148,18 @@ int main(int argc, char *argv[])
 {
     if (PIN_Init(argc, argv)) return Usage();
 
-    FILE* file = fopen(KnobTraceFile.Value().c_str(), "wb");
     UINT32 limit = KnobFileSize.Value();
-    mem_trace = new MemAddrTrace(KnobBufferSize.Value(), file, limit);
+    mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
+        KnobTraceFile.Value().c_str(), limit);
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
     INS_AddInstrumentFunction(Instruction, 0);
-    PIN_AddFiniFunction(Fini, file);
+    PIN_AddFiniFunction(Fini, 0);
 
     // Never returns
     PIN_StartProgram();
     
     return 0;
 }
+
