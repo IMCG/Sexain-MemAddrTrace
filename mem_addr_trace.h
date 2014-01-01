@@ -1,6 +1,5 @@
 // mem_addr_trace.h
-// Jinglei Ren <jinglei.ren@gmail.com>
-// Dec. 20, 2013
+// Copyright (c) 2013 Jinglei Ren <jinglei.ren@stanzax.org>
 
 #ifndef SEXAIN_MEM_ADDR_TRACE_H_
 #define SEXAIN_MEM_ADDR_TRACE_H_
@@ -52,20 +51,21 @@ MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
   ins_array_ = new UINT32[buffer_size_];
   addr_array_ = new VOID*[buffer_size_];
   op_array_ = new char[buffer_size_];
-  ins_compressed_ = new UINT32[buffer_size_];
-  addr_compressed_ = new VOID*[buffer_size_];
-  op_compressed_ = new char[buffer_size_];
+  ins_compressed_ = (UINT32*)malloc(
+      compressBound(sizeof(UINT32) * buffer_size_));
+  addr_compressed_ = (VOID**)malloc(
+      compressBound(sizeof(VOID*) * buffer_size_));
+  op_compressed_ = (char*)malloc(compressBound(sizeof(char) * buffer_size_));
 }
 
 MemAddrTrace::~MemAddrTrace() {
-  fflush(file_);
   fclose(file_);
-  delete ins_array_;
-  delete addr_array_;
-  delete op_array_;
-  delete ins_compressed_;
-  delete addr_compressed_;
-  delete op_compressed_;
+  delete[] ins_array_;
+  delete[] addr_array_;
+  delete[] op_array_;
+  free(ins_compressed_);
+  free(addr_compressed_);
+  free(op_compressed_);
 }
 
 // Should be protected by lock_
