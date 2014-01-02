@@ -16,7 +16,7 @@ class MemAddrTrace {
   void Input(UINT32 ins_seq, VOID* addr, char op);
   void Flush();
 
-  UINT32 buffer_size() const { return buffer_size_; }
+  UINT32 buffer_size() const { return buf_len_; }
   FILE* file() const { return file_; }
 
   UINT64 file_size() const { return file_size_; }
@@ -25,7 +25,7 @@ class MemAddrTrace {
  private:
   void DoFlush();
 
-  const UINT32 buffer_size_;
+  const UINT32 buf_len_;
   FILE* file_;
   UINT64 file_size_; // max file size
   PIN_LOCK lock_;
@@ -39,7 +39,7 @@ class MemAddrTrace {
 };
 
 MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
-    buffer_size_(buf_size), end_(0) {
+    buf_len_(buf_size), end_(0) {
   file_ = fopen(file, "wb");
   fwrite(&buf_size, sizeof(buf_size), 1, file_);
 
@@ -48,12 +48,12 @@ MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
 
   set_file_size(max_mb);
   PIN_InitLock(&lock_);
-  ins_array_ = new UINT32[buffer_size_];
-  addr_array_ = new VOID*[buffer_size_];
-  op_array_ = new char[buffer_size_];
-  ins_compressed_ = malloc(compressBound(sizeof(UINT32) * buffer_size_));
-  addr_compressed_ = malloc(compressBound(sizeof(VOID*) * buffer_size_));
-  op_compressed_ = malloc(compressBound(sizeof(char) * buffer_size_));
+  ins_array_ = new UINT32[buf_len_];
+  addr_array_ = new VOID*[buf_len_];
+  op_array_ = new char[buf_len_];
+  ins_compressed_ = malloc(compressBound(sizeof(UINT32) * buf_len_));
+  addr_compressed_ = malloc(compressBound(sizeof(VOID*) * buf_len_));
+  op_compressed_ = malloc(compressBound(sizeof(char) * buf_len_));
 }
 
 MemAddrTrace::~MemAddrTrace() {
@@ -68,37 +68,37 @@ MemAddrTrace::~MemAddrTrace() {
 
 // Should be protected by lock_
 void MemAddrTrace::DoFlush() {
-  if (end_ > buffer_size_) {
+  if (end_ > buf_len_) {
     fprintf(stderr, "[Warn] MemAddrTrace::DoFlush overflows with end = %d\n",
       end_);
-    end_ = buffer_size_;
+    end_ = buf_len_;
   }
   if ((UINT64)ftell(file_) < file_size_) {
-    uLong buf_len;
+    uLong len;
 
-    buf_len = sizeof(UINT32) * end_;
-    if (compress((Bytef*)ins_compressed_, &buf_len,
-        (Bytef*)ins_array_, buf_len) == Z_OK) {
-      fwrite(&buf_len, sizeof(buf_len), 1, file_);
-      fwrite(ins_compressed_, buf_len, 1, file_);
+    len = compressBound(sizeof(UINT32) * end_);
+    if (compress((Bytef*)ins_compressed_, &len,
+        (Bytef*)ins_array_, sizeof(UINT32) * end_) == Z_OK) {
+      fwrite(&len, sizeof(len), 1, file_);
+      fwrite(ins_compressed_, len, 1, file_);
     } else {
       fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
     }
 
-    buf_len = sizeof(VOID*) * end_;
-    if (compress((Bytef*)addr_compressed_, &buf_len,
-        (Bytef*)addr_array_, buf_len) == Z_OK) {
-      fwrite(&buf_len, sizeof(buf_len), 1, file_);
-      fwrite(addr_compressed_, buf_len, 1, file_);
+    len = compressBound(sizeof(VOID*) * end_);
+    if (compress((Bytef*)addr_compressed_, &len,
+        (Bytef*)addr_array_, sizeof(VOID*) * end_) == Z_OK) {
+      fwrite(&len, sizeof(len), 1, file_);
+      fwrite(addr_compressed_, len, 1, file_);
     } else {
       fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
     }
 
-    buf_len = sizeof(char) * end_;
-    if (compress((Bytef*)op_compressed_, &buf_len,
-        (Bytef*)op_array_, buf_len) == Z_OK) {
-      fwrite(&buf_len, sizeof(buf_len), 1, file_);
-      fwrite(op_compressed_, buf_len, 1, file_);
+    len = compressBound(sizeof(char) * end_);
+    if (compress((Bytef*)op_compressed_, &len,
+        (Bytef*)op_array_, sizeof(char) * end_) == Z_OK) {
+      fwrite(&len, sizeof(len), 1, file_);
+      fwrite(op_compressed_, len, 1, file_);
     } else {
       fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
     }
@@ -108,7 +108,7 @@ void MemAddrTrace::DoFlush() {
 
 void MemAddrTrace::Input(UINT32 ins_seq, VOID* addr, char op) {
   PIN_GetLock(&lock_, 0);
-  if (end_ == buffer_size_) {
+  if (end_ == buf_len_) {
     DoFlush();
   }
 
