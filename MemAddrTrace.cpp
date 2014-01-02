@@ -47,6 +47,10 @@ static TLS_KEY tls_ins_count;
 #define TLS_INS_COUNT(tid) \
     (static_cast<UINT32*>(PIN_GetThreadData(tls_ins_count, tid)))
 
+#ifdef TEST
+FILE* test_out;
+#endif
+
 VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
     UINT32* tdata = new UINT32;
@@ -66,11 +70,19 @@ VOID InsCount(THREADID tid)
 VOID RecordMemRead(THREADID tid, VOID * addr)
 {
     mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'R');
+#ifdef TEST
+    fprintf(test_out, "%u\t%llu\t%c\n",
+            *TLS_INS_COUNT(tid), (unsigned long long)addr, 'R');
+#endif
 }
 
 VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
     mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'W');
+#ifdef TEST
+    fprintf(test_out, "%u\t%llu\t%c\n",
+            *TLS_INS_COUNT(tid), (unsigned long long)addr, 'W');
+#endif
 }
 
 // Is called for every instruction and instruments reads and writes
@@ -117,6 +129,9 @@ VOID Fini(INT32 code, VOID *v)
 {
     mem_trace->Flush();
     delete mem_trace;
+#ifdef TEST
+    fclose(test_out);
+#endif
 }
 
 /* Added command line option: buffer size */
@@ -151,6 +166,9 @@ int main(int argc, char *argv[])
     UINT32 limit = KnobFileSize.Value();
     mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
         KnobTraceFile.Value().c_str(), limit);
+#ifdef TEST
+    test_out = fopen("MemAddrTrace.test", "w");
+#endif
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
