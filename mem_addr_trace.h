@@ -33,9 +33,9 @@ class MemAddrTrace {
   UINT32* ins_array_;
   VOID** addr_array_;
   char* op_array_;
-  UINT32* ins_compressed_;
-  VOID** addr_compressed_;
-  char* op_compressed_;
+  void* ins_compressed_;
+  void* addr_compressed_;
+  void* op_compressed_;
 };
 
 MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
@@ -43,19 +43,17 @@ MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
   file_ = fopen(file, "wb");
   fwrite(&buf_size, sizeof(buf_size), 1, file_);
 
-  UINT32 ptr_bits = sizeof(VOID*);
-  fwrite(&ptr_bits, sizeof(ptr_bits), 1, file_);
+  UINT32 ptr_bytes = sizeof(VOID*);
+  fwrite(&ptr_bytes, sizeof(ptr_bytes), 1, file_);
 
   set_file_size(max_mb);
   PIN_InitLock(&lock_);
   ins_array_ = new UINT32[buffer_size_];
   addr_array_ = new VOID*[buffer_size_];
   op_array_ = new char[buffer_size_];
-  ins_compressed_ = (UINT32*)malloc(
-      compressBound(sizeof(UINT32) * buffer_size_));
-  addr_compressed_ = (VOID**)malloc(
-      compressBound(sizeof(VOID*) * buffer_size_));
-  op_compressed_ = (char*)malloc(compressBound(sizeof(char) * buffer_size_));
+  ins_compressed_ = malloc(compressBound(sizeof(UINT32) * buffer_size_));
+  addr_compressed_ = malloc(compressBound(sizeof(VOID*) * buffer_size_));
+  op_compressed_ = malloc(compressBound(sizeof(char) * buffer_size_));
 }
 
 MemAddrTrace::~MemAddrTrace() {

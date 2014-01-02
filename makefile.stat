@@ -1,0 +1,8 @@
+CXX=g++
+FLAGS= -std=c++0x -O3 -Wall
+LIBS= -lz
+
+all: MemAddrStat.o
+
+MemAddrStat.o: MemAddrStat.cpp mem_addr_parser.h
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
