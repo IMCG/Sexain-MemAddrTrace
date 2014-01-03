@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cerrno>
+#include <cassert>
 #include <iostream>
 #include <unordered_set>
 #include <unordered_map>
@@ -19,7 +20,7 @@ class MemAddrStat {
  public:
   MemAddrStat(unsigned int page_bits);
   void Input(uint64_t addr);
-  int Fillout(double percents[], const int num); 
+  void Fillout(double percents[], const unsigned int num); 
   void Clear();
 
  private:
@@ -31,10 +32,7 @@ class MemAddrStat {
 
 MemAddrStat::MemAddrStat(unsigned int page_bits) :
     page_bits_(page_bits), num_blocks_(1 << (page_bits - CACHE_BLOCK_BITS)) {
-  if (num_blocks_ == 0) {
-    std::cerr << "[Error] MemAddrStat init failed: page_bits="
-        << page_bits_ << std::endl;
-  }
+  assert(num_blocks_);
 }
 
 inline void MemAddrStat::Input(uint64_t addr) {
@@ -46,11 +44,8 @@ inline void MemAddrStat::Clear() {
   pages_.clear();
 }
 
-int MemAddrStat::Fillout(double percents[], const int num) {
-  if (!pages_.empty()) {
-    std::cerr << "[Warn] Fillout: group set not empty." << std::endl;
-    return -EIO;
-  }
+void MemAddrStat::Fillout(double percents[], const unsigned int num) {
+  assert(pages_.empty() && num_blocks_ % num == 0);
   // Count how many blocks are dirty in a page
   for (BlockSet::iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
@@ -58,28 +53,25 @@ int MemAddrStat::Fillout(double percents[], const int num) {
   }
 
   // Clear percents[] for page count
-  for (int i = 0; i < num; ++i) {
+  for (unsigned int i = 0; i < num; ++i) {
     percents[i] = 0;
   }
 
-  double percent;
+  unsigned int pi;
   for (PageMap::iterator it = pages_.begin();
       it != pages_.end(); ++it) {
-    percent = it->second / (double)num_blocks_;
-    percents[int(percent * num)] += 1;
+    // num_blocks is exactly divisible by num
+    pi = (unsigned int)((it->second - 1) / (double)num_blocks_ * num);
+    assert(pi < num);
+    percents[pi] += 1;
   }
 
   double num_pages = 0; // for integrity check
-  for (int i = 0; i < num; ++i) {
+  for (unsigned int i = 0; i < num; ++i) {
     num_pages += percents[i];
-    percents[i] /= pages_.size();
+    percents[i] /= (pages_.size() ? pages_.size() : 1);
   }
-  if (num_pages != pages_.size()) {
-    std::cerr << "[Warn] Fillout() integrity check failed: "
-        << num_pages << "!=" << pages_.size() << std::endl;
-    return -EFAULT;
-  }
-  return 0;
+  assert(num_pages == pages_.size());
 }
 
 #endif // SEXAIN_MEM_ADDR_STAT_H_
