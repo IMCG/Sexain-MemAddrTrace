@@ -52,7 +52,7 @@ DLL_ROOTS :=
 # This defines any static libraries (archives), that need to be built.
 LIB_ROOTS :=
 
-TOOL_CXXFLAGS += -std=c++0x -DTEST
+TOOL_CXXFLAGS += -std=c++0x #-DTEST
 TOOL_LIBS += -lz
 
 ##############################################################
