@@ -69,7 +69,9 @@ VOID InsCount(THREADID tid)
 
 VOID RecordMemRead(THREADID tid, VOID * addr)
 {
-    mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'R');
+    if (!mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'R')) {
+        PIN_Detach();
+    }
 #ifdef TEST
     fprintf(test_out, "%u\t%llu\t%c\n",
             *TLS_INS_COUNT(tid), (unsigned long long)addr, 'R');
@@ -78,7 +80,9 @@ VOID RecordMemRead(THREADID tid, VOID * addr)
 
 VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
-    mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'W');
+    if (!mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'W')) {
+        PIN_Detach();
+    }
 #ifdef TEST
     fprintf(test_out, "%u\t%llu\t%c\n",
             *TLS_INS_COUNT(tid), (unsigned long long)addr, 'W');
@@ -125,13 +129,18 @@ VOID Instruction(INS ins, VOID *v)
     }
 }
 
-VOID Fini(INT32 code, VOID *v)
+VOID Detach(VOID *v)
 {
-    mem_trace->Flush();
     delete mem_trace;
 #ifdef TEST
     fclose(test_out);
-#endif
+#endif   
+}
+
+VOID Fini(INT32 code, VOID *v)
+{
+    mem_trace->Flush();
+    Detach(v);
 }
 
 /* Added command line option: buffer size */
@@ -142,7 +151,7 @@ KNOB<string> KnobTraceFile(KNOB_MODE_WRITEONCE, "pintool",
     "o", "mem_addr.trace", "specify output file name");
 
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
-    "file_size", "16384", "specify the max file size in MB");
+    "file_size", "1024", "specify the max file size in MB");
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -174,6 +183,7 @@ int main(int argc, char *argv[])
     PIN_AddThreadFiniFunction(ThreadFini, 0);
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
+    PIN_AddDetachFunction(Detach, 0);
 
     // Never returns
     PIN_StartProgram();

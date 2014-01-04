@@ -13,4 +13,12 @@ To make trace parser and analyser:
 ```
 $ make -f makefile.stat
 ```
+To run an application with Pintool:
+```
+$ pin -t obj-intel64/MemAddrTrace.so -- <app>
+```
+To attach Pintool to a running process (note the full path):
+```
+$ pin -pid <process ID> -t <full path>/MemAddrTrace.so
+```
 More info about Pin can be found in [here](http://software.intel.com/en-us/articles/pintool).
