@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cassert>
 #include "zlib.h"
 
 struct MemRecord {
@@ -66,14 +67,19 @@ MemAddrParser::~MemAddrParser() {
 bool MemAddrParser::Replenish() {
   next_ = 0;
   if (!file_) return false;
-  uLong ins_len, addr_len, op_len;
-  if (!fread(&ins_len, sizeof(ins_len), 1, file_) ||
-      !fread(ins_comp_, ins_len, 1, file_) ||
+  uLong ins_len = 0, addr_len = 0, op_len = 0;
+  if (!fread(&ins_len, sizeof(ins_len), 1, file_)) { 
+    fprintf(stderr, "MemAddrParser::Replenish() stops at %lu\n", ftell(file_));
+    Close();
+    return false;
+  }
+  if (!fread(ins_comp_, ins_len, 1, file_) ||
       !fread(&addr_len, sizeof(addr_len), 1, file_) ||
       !fread(addr_comp_, addr_len, 1, file_) ||
       !fread(&op_len, sizeof(op_len), 1, file_) ||
       !fread(op_comp_, op_len, 1, file_)) {
-    fprintf(stderr, "MemAddrParser::Replenish() stops at %lu\n", ftell(file_));
+    fprintf(stderr, "[Error] MemAddrParser::Replenish() unexpected end: "
+        "ins_len=%lu, addr_len=%lu, op_len=%lu\n", ins_len, addr_len, op_len);
     Close();
     return false;
   }
@@ -119,7 +125,7 @@ bool MemAddrParser::Next(MemRecord* rec) {
   rec->mem_addr = *((uint64_t*)
       (addr_array_ + ptr_bytes_ * next_ / sizeof(char)));
   rec->op = op_array_[next_];
-
+  assert(rec->op == 'R' || rec->op == 'W');
   return ++next_;
 }
 
