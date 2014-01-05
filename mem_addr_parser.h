@@ -80,6 +80,7 @@ bool MemAddrParser::Replenish() {
       !fread(op_comp_, op_len, 1, file_)) {
     fprintf(stderr, "[Error] MemAddrParser::Replenish() unexpected end: "
         "ins_len=%lu, addr_len=%lu, op_len=%lu\n", ins_len, addr_len, op_len);
+    fprintf(stderr, "MemAddrParser::Replenish() stops at %lu\n", ftell(file_));
     Close();
     return false;
   }

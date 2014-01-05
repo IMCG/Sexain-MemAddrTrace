@@ -39,13 +39,26 @@ END_LEGAL */
 #include "pin.H"
 #include "mem_addr_trace.h"
 
+#define CACHE_LINE_SIZE 64 // bytes
+
 static MemAddrTrace * mem_trace;
 
 static std::atomic_uint g_ins_count;
 static TLS_KEY tls_ins_count;
 
+class tls_int32
+{
+  public:
+    UINT32 value() { return value_; }
+    void set_value(UINT32 v) { value_ = v; }
+  private:
+    UINT32 value_;
+    // Force each TLS data to be in its own data cache line
+    UINT8 pad_[CACHE_LINE_SIZE - sizeof(value_)];
+};
+
 #define TLS_INS_COUNT(tid) \
-    (static_cast<UINT32*>(PIN_GetThreadData(tls_ins_count, tid)))
+    (static_cast<tls_int32*>(PIN_GetThreadData(tls_ins_count, tid)))
 
 #ifdef TEST
 FILE* test_out;
@@ -53,7 +66,7 @@ FILE* test_out;
 
 VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
-    UINT32* tdata = new UINT32;
+    tls_int32* tdata = new tls_int32;
     PIN_SetThreadData(tls_ins_count, tdata, tid);
 }
 
@@ -64,28 +77,28 @@ VOID ThreadFini(THREADID tid, const CONTEXT *ctxt, INT32 flags, VOID *v)
 
 VOID InsCount(THREADID tid)
 {
-    *TLS_INS_COUNT(tid) = ++g_ins_count;
+    TLS_INS_COUNT(tid)->set_value(++g_ins_count);
 }
 
 VOID RecordMemRead(THREADID tid, VOID * addr)
 {
-    if (!mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'R')) {
+    if (!mem_trace->Input(TLS_INS_COUNT(tid)->value(), addr, 'R')) {
         PIN_Detach();
     }
 #ifdef TEST
     fprintf(test_out, "%u\t%llu\t%c\n",
-            *TLS_INS_COUNT(tid), (unsigned long long)addr, 'R');
+            TLS_INS_COUNT(tid)->value(), (unsigned long long)addr, 'R');
 #endif
 }
 
 VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
-    if (!mem_trace->Input(*TLS_INS_COUNT(tid), addr, 'W')) {
+    if (!mem_trace->Input(TLS_INS_COUNT(tid)->value(), addr, 'W')) {
         PIN_Detach();
     }
 #ifdef TEST
     fprintf(test_out, "%u\t%llu\t%c\n",
-            *TLS_INS_COUNT(tid), (unsigned long long)addr, 'W');
+            TLS_INS_COUNT(tid)->value(), (unsigned long long)addr, 'W');
 #endif
 }
 

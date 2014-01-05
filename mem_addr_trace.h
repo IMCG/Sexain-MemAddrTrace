@@ -70,36 +70,28 @@ MemAddrTrace::~MemAddrTrace() {
 // Should be protected by lock_
 bool MemAddrTrace::DoFlush() {
   assert(end_ <= buf_len_);
+  if (end_ == 0) return true;
   if ((UINT64)ftell(file_) > file_size_) return false;
 
   uLong len;
 
   len = compressBound(sizeof(UINT32) * end_);
-  if (compress((Bytef*)ins_compressed_, &len,
-      (Bytef*)ins_array_, sizeof(UINT32) * end_) == Z_OK) {
-    fwrite(&len, sizeof(len), 1, file_);
-    fwrite(ins_compressed_, len, 1, file_);
-  } else {
-    fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
-  }
+  assert(compress((Bytef*)ins_compressed_, &len,
+      (Bytef*)ins_array_, sizeof(UINT32) * end_) == Z_OK);
+  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
+  assert(fwrite(ins_compressed_, 1, len, file_) == len);
 
   len = compressBound(sizeof(VOID*) * end_);
-  if (compress((Bytef*)addr_compressed_, &len,
-      (Bytef*)addr_array_, sizeof(VOID*) * end_) == Z_OK) {
-    fwrite(&len, sizeof(len), 1, file_);
-    fwrite(addr_compressed_, len, 1, file_);
-  } else {
-    fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
-  }
+  assert(compress((Bytef*)addr_compressed_, &len,
+      (Bytef*)addr_array_, sizeof(VOID*) * end_) == Z_OK);
+  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
+  assert(fwrite(addr_compressed_, 1, len, file_) == len);
 
   len = compressBound(sizeof(char) * end_);
-  if (compress((Bytef*)op_compressed_, &len,
-      (Bytef*)op_array_, sizeof(char) * end_) == Z_OK) {
-    fwrite(&len, sizeof(len), 1, file_);
-    fwrite(op_compressed_, len, 1, file_);
-  } else {
-    fprintf(stderr, "[Warn] MemAddrTrace::DoFlush failed on compression.\n");
-  }
+  assert(compress((Bytef*)op_compressed_, &len,
+      (Bytef*)op_array_, sizeof(char) * end_) == Z_OK);
+  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
+  assert(fwrite(op_compressed_, 1, len, file_) == len);
 
   end_ = 0;
   return true;
