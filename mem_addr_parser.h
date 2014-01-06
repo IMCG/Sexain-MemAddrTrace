@@ -77,7 +77,7 @@ MemAddrParser::~MemAddrParser() {
 bool MemAddrParser::Replenish() {
   if (!file_) return false;
   uLong ins_len = 0, addr_len = 0, op_len = 0;
-  if (fread(&ins_len, sizeof(ins_len), 1, file_) != 1) { 
+  if (fread(&ins_len, sizeof(ins_len), 1, file_) != 1) {
     assert(ftell(file_) == (fseek(file_, 0, SEEK_END), ftell(file_)));
     Close();
     return false;

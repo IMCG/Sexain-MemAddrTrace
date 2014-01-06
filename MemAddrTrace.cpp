@@ -170,7 +170,6 @@ KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
 
 VOID AfterForkInChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
-    mem_trace->release_file();
     delete mem_trace;
 
     std::string file_name(KnobFilePrefix.Value());

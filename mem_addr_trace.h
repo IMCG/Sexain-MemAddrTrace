@@ -25,7 +25,6 @@ class MemAddrTrace {
 
   UINT32 buffer_size() const { return buf_len_; }
   FILE* file() const { return file_; }
-  void release_file() { file_ = NULL; }
 
   UINT64 file_size() const { return file_size_; }
   void set_file_size(UINT32 mb) { file_size_ = (UINT64)mb << 20; }
