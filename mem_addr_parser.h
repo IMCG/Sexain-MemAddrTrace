@@ -10,6 +10,12 @@
 #include <cassert>
 #include "zlib.h"
 
+#ifdef NDEBUG
+#define BUG_ON(v) (if (v) fprintf(stderr, "[Warn] %s, %d", __FILE__, __LINE__))
+#else
+#define BUG_ON(v) (assert(!(v)))
+#endif
+
 struct MemRecord {
   uint64_t ins_seq;
   uint64_t mem_addr;
@@ -22,16 +28,18 @@ class MemAddrParser {
   ~MemAddrParser();
 
   bool Next(MemRecord* rec);
+  uint32_t buffer_count() const { return buffer_count_; }
 
  private:
   bool Replenish();
   void Close();
 
   FILE* file_;
-  uint32_t buf_len_;
+  uint32_t buffer_count_;
   uint32_t ptr_bytes_;
 
-  uint32_t next_;
+  uint32_t i_next_;
+  uint32_t i_limit_;
   uint32_t* ins_array_;
   char* addr_array_;
   char* op_array_;
@@ -42,20 +50,22 @@ class MemAddrParser {
 
 MemAddrParser::MemAddrParser(const char* file) {
   file_ = fopen(file, "rb");
-  if (!fread(&buf_len_, sizeof(buf_len_), 1, file_) ||
-      !fread(&ptr_bytes_, sizeof(ptr_bytes_), 1, file_) ||
-      buf_len_ > 0x10000000 || (ptr_bytes_ & 0x60) != 0) {
+  if (fread(&buffer_count_, sizeof(buffer_count_), 1, file_) != 1 ||
+      fread(&ptr_bytes_, sizeof(ptr_bytes_), 1, file_) != 1 ||
+      buffer_count() > 0x10000000 || (ptr_bytes_ & 0x60) != 0) {
     fclose(file_);
     file_ = NULL;
     fprintf(stderr, "[Error] MemAddrParser init failed.\n");
     return;
   }
-  ins_array_ = new uint32_t[buf_len_];
-  addr_array_ = new char[buf_len_ * ptr_bytes_ / sizeof(char)];
-  op_array_ = new char[buf_len_];
-  ins_comp_ = (Bytef*)malloc(compressBound(sizeof(uint32_t) * buf_len_));
-  addr_comp_ = (Bytef*)malloc(compressBound(ptr_bytes_ * buf_len_));
-  op_comp_ = (Bytef*)malloc(compressBound(sizeof(char) * buf_len_));
+  ins_array_ = new uint32_t[buffer_count()];
+  addr_array_ = new char[buffer_count() * ptr_bytes_ / sizeof(char)];
+  op_array_ = new char[buffer_count()];
+  ins_comp_ = (Bytef*)malloc(compressBound(sizeof(uint32_t) * buffer_count()));
+  addr_comp_ = (Bytef*)malloc(compressBound(ptr_bytes_ * buffer_count()));
+  op_comp_ = (Bytef*)malloc(compressBound(sizeof(char) * buffer_count()));
+  i_next_ = 0;
+  i_limit_ = buffer_count();
 
   Replenish();
 }
@@ -65,42 +75,47 @@ MemAddrParser::~MemAddrParser() {
 }
 
 bool MemAddrParser::Replenish() {
-  next_ = 0;
   if (!file_) return false;
   uLong ins_len = 0, addr_len = 0, op_len = 0;
-  if (!fread(&ins_len, sizeof(ins_len), 1, file_)) { 
-    fprintf(stderr, "MemAddrParser::Replenish() stops at %lu\n", ftell(file_));
+  if (fread(&ins_len, sizeof(ins_len), 1, file_) != 1) { 
+    assert(ftell(file_) == (fseek(file_, 0, SEEK_END), ftell(file_)));
     Close();
     return false;
   }
-  if (!fread(ins_comp_, ins_len, 1, file_) ||
-      !fread(&addr_len, sizeof(addr_len), 1, file_) ||
-      !fread(addr_comp_, addr_len, 1, file_) ||
-      !fread(&op_len, sizeof(op_len), 1, file_) ||
-      !fread(op_comp_, op_len, 1, file_)) {
-    fprintf(stderr, "[Error] MemAddrParser::Replenish() unexpected end: "
-        "ins_len=%lu, addr_len=%lu, op_len=%lu\n", ins_len, addr_len, op_len);
-    fprintf(stderr, "MemAddrParser::Replenish() stops at %lu\n", ftell(file_));
-    Close();
-    return false;
-  }
-  
+  BUG_ON(fread(ins_comp_, 1, ins_len, file_) != ins_len);
+
+  BUG_ON(fread(&addr_len, sizeof(addr_len), 1, file_) != 1);
+  BUG_ON(fread(addr_comp_, 1, addr_len, file_) != addr_len);
+
+  BUG_ON(fread(&op_len, sizeof(op_len), 1, file_) != 1);
+  BUG_ON(fread(op_comp_, 1, op_len, file_) != op_len);
+
   uLong len;
-  if ((len = buf_len_ * sizeof(uint32_t),
-      uncompress((Bytef*)ins_array_, &len, ins_comp_, ins_len) != Z_OK) ||
-      (len = buf_len_ * ptr_bytes_,
-      uncompress((Bytef*)addr_array_, &len, addr_comp_, addr_len) != Z_OK) ||
-      (len = buf_len_ * sizeof(char),
-      uncompress((Bytef*)op_array_, &len, op_comp_, op_len) != Z_OK)) {
-    fprintf(stderr, "MemAddrParser::Replenish() failed on uncompression.\n");
-    Close();
-    return false;
+  int ret;
+  len = buffer_count() * sizeof(uint32_t);
+  ret = uncompress((Bytef*)ins_array_, &len, ins_comp_, ins_len);
+  if (ret != Z_OK) {
+    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for ins_array_ "
+        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
+  }
+  len = buffer_count() * ptr_bytes_;
+  ret = uncompress((Bytef*)addr_array_, &len, addr_comp_, addr_len) != Z_OK;
+  if (ret != Z_OK) {
+    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for addr_array_ "
+        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
+  }
+  len = buffer_count() * sizeof(char);
+  ret = uncompress((Bytef*)op_array_, &len, op_comp_, op_len) != Z_OK;
+  if (ret != Z_OK) {
+    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for op_array_ "
+        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
   }
 
-  if (len / sizeof(char) != buf_len_) {
-    buf_len_ = len / sizeof(char);
+  i_next_ = 0;
+  if (len / sizeof(char) != i_limit_) {
+    i_limit_ = len / sizeof(char);
     fprintf(stderr, "MemAddrParser::Replenish() partial buffer: %u\n",
-        buf_len_);
+        i_limit_);
   }
   return true;
 }
@@ -118,16 +133,16 @@ void MemAddrParser::Close() {
 }
 
 bool MemAddrParser::Next(MemRecord* rec) {
-  if (next_ == buf_len_ && !Replenish()) {
+  if (!file_ || (i_next_ == i_limit_ && !Replenish())) {
     return false;
   }
 
-  rec->ins_seq = ins_array_[next_];
+  rec->ins_seq = ins_array_[i_next_];
   rec->mem_addr = *((uint64_t*)
-      (addr_array_ + ptr_bytes_ * next_ / sizeof(char)));
-  rec->op = op_array_[next_];
-  assert(rec->op == 'R' || rec->op == 'W');
-  return ++next_;
+      (addr_array_ + ptr_bytes_ * i_next_ / sizeof(char)));
+  rec->op = op_array_[i_next_];
+  BUG_ON(rec->op != 'R' && rec->op != 'W');
+  return ++i_next_;
 }
 
 #endif // SEXAIN_MEM_ADDR_PARSER_H_

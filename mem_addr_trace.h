@@ -4,10 +4,16 @@
 #ifndef SEXAIN_MEM_ADDR_TRACE_H_
 #define SEXAIN_MEM_ADDR_TRACE_H_
 
-#include <stdio.h>
+#include <cstdio>
 #include <cassert>
 #include "pin.H"
 #include "zlib.h"
+
+#ifdef NDEBUG
+#define BUG_ON(v) (if (v) fprintf(stderr, "[Warn] %s, %d", __FILE__, __LINE__))
+#else
+#define BUG_ON(v) (assert(!(v)))
+#endif
 
 class MemAddrTrace {
  public:
@@ -19,6 +25,7 @@ class MemAddrTrace {
 
   UINT32 buffer_size() const { return buf_len_; }
   FILE* file() const { return file_; }
+  void release_file() { file_ = NULL; }
 
   UINT64 file_size() const { return file_size_; }
   void set_file_size(UINT32 mb) { file_size_ = (UINT64)mb << 20; }
@@ -58,7 +65,7 @@ MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
 }
 
 MemAddrTrace::~MemAddrTrace() {
-  fclose(file_);
+  if (file_) fclose(file_);
   delete[] ins_array_;
   delete[] addr_array_;
   delete[] op_array_;
@@ -69,29 +76,29 @@ MemAddrTrace::~MemAddrTrace() {
 
 // Should be protected by lock_
 bool MemAddrTrace::DoFlush() {
-  assert(end_ <= buf_len_);
+  BUG_ON(end_ > buf_len_);
   if (end_ == 0) return true;
-  if ((UINT64)ftell(file_) > file_size_) return false;
+  if (!file_ || (UINT64)ftell(file_) > file_size_) return false;
 
   uLong len;
 
   len = compressBound(sizeof(UINT32) * end_);
-  assert(compress((Bytef*)ins_compressed_, &len,
-      (Bytef*)ins_array_, sizeof(UINT32) * end_) == Z_OK);
-  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
-  assert(fwrite(ins_compressed_, 1, len, file_) == len);
+  BUG_ON(compress((Bytef*)ins_compressed_, &len,
+      (Bytef*)ins_array_, sizeof(UINT32) * end_) != Z_OK);
+  BUG_ON(fwrite(&len, sizeof(len), 1, file_) != 1);
+  BUG_ON(fwrite(ins_compressed_, 1, len, file_) != len);
 
   len = compressBound(sizeof(VOID*) * end_);
-  assert(compress((Bytef*)addr_compressed_, &len,
-      (Bytef*)addr_array_, sizeof(VOID*) * end_) == Z_OK);
-  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
-  assert(fwrite(addr_compressed_, 1, len, file_) == len);
+  BUG_ON(compress((Bytef*)addr_compressed_, &len,
+      (Bytef*)addr_array_, sizeof(VOID*) * end_) != Z_OK);
+  BUG_ON(fwrite(&len, sizeof(len), 1, file_) != 1);
+  BUG_ON(fwrite(addr_compressed_, 1, len, file_) != len);
 
   len = compressBound(sizeof(char) * end_);
-  assert(compress((Bytef*)op_compressed_, &len,
-      (Bytef*)op_array_, sizeof(char) * end_) == Z_OK);
-  assert(fwrite(&len, sizeof(len), 1, file_) == 1);
-  assert(fwrite(op_compressed_, 1, len, file_) == len);
+  BUG_ON(compress((Bytef*)op_compressed_, &len,
+      (Bytef*)op_array_, sizeof(char) * end_) != Z_OK);
+  BUG_ON(fwrite(&len, sizeof(len), 1, file_) != 1);
+  BUG_ON(fwrite(op_compressed_, 1, len, file_) != len);
 
   end_ = 0;
   return true;

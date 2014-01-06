@@ -34,7 +34,8 @@ END_LEGAL */
  *  Create Date: 12/20/2013
  */
 
-#include <stdio.h>
+#include <cstdio>
+#include <string>
 #include <atomic>
 #include "pin.H"
 #include "mem_addr_trace.h"
@@ -66,7 +67,8 @@ FILE* test_out;
 
 VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
-    tls_int32* tdata = new tls_int32;
+    tls_int32* tdata = TLS_INS_COUNT(tid);
+    if (!tdata) tdata = new tls_int32; // may exist in a forked child process
     PIN_SetThreadData(tls_ins_count, tdata, tid);
 }
 
@@ -147,7 +149,7 @@ VOID Detach(VOID *v)
     delete mem_trace;
 #ifdef TEST
     fclose(test_out);
-#endif   
+#endif 
 }
 
 VOID Fini(INT32 code, VOID *v)
@@ -160,11 +162,23 @@ VOID Fini(INT32 code, VOID *v)
 KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
     "buffer_size", "1048576", "specify the number of records to buffer");
 
-KNOB<string> KnobTraceFile(KNOB_MODE_WRITEONCE, "pintool",
-    "o", "mem_addr.trace", "specify output file name");
+KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
+    "file_prefix", "mem_addr", "specify prefix of output file name");
 
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
     "file_size", "1024", "specify the max file size in MB");
+
+VOID AfterForkInChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
+{
+    mem_trace->release_file();
+    delete mem_trace;
+
+    std::string file_name(KnobFilePrefix.Value());
+    file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
+    mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
+        file_name.c_str(), KnobFileSize.Value());
+    g_ins_count = 0;
+}
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -185,15 +199,17 @@ int main(int argc, char *argv[])
 {
     if (PIN_Init(argc, argv)) return Usage();
 
-    UINT32 limit = KnobFileSize.Value();
+    std::string file_name(KnobFilePrefix.Value());
+    file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
     mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
-        KnobTraceFile.Value().c_str(), limit);
+        file_name.c_str(), KnobFileSize.Value());
 #ifdef TEST
-    test_out = fopen("MemAddrTrace.test", "w");
+    test_out = fopen(file_name.append(".test").c_str(), "w");
 #endif
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
+    PIN_AddForkFunction(FPOINT_AFTER_IN_CHILD, AfterForkInChild, 0);
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
     PIN_AddDetachFunction(Detach, 0);
