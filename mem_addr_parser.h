@@ -46,6 +46,7 @@ class MemAddrParser {
   Bytef* ins_comp_;
   Bytef* addr_comp_;
   Bytef* op_comp_;
+  uint64_t last_ins_; // for sequential check
 };
 
 MemAddrParser::MemAddrParser(const char* file) {
@@ -66,6 +67,7 @@ MemAddrParser::MemAddrParser(const char* file) {
   op_comp_ = (Bytef*)malloc(compressBound(sizeof(char) * buffer_count()));
   i_next_ = 0;
   i_limit_ = buffer_count();
+  last_ins_ = 0;
 
   Replenish();
 }
@@ -142,6 +144,12 @@ bool MemAddrParser::Next(MemRecord* rec) {
       (addr_array_ + ptr_bytes_ * i_next_ / sizeof(char)));
   rec->op = op_array_[i_next_];
   BUG_ON(rec->op != 'R' && rec->op != 'W');
+
+  if (rec->ins_seq < last_ins_) {
+    fprintf(stderr, "[Warn] instruction sequence decreases: %lu\t%lu\t%c"
+        " < %lu\n", rec->ins_seq, rec->mem_addr, rec->op, last_ins_);
+  }
+  last_ins_ = rec->ins_seq;
   return ++i_next_;
 }
 
