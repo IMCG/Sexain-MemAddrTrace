@@ -20,7 +20,8 @@ class MemAddrStat {
  public:
   MemAddrStat(unsigned int page_bits);
   void Input(uint64_t addr);
-  void Fillout(double percents[], const unsigned int num); 
+  void Fillout(double percents[], const int num_buckets);
+  unsigned int GetBlockNum() const { return blocks_.size(); } 
   void Clear();
 
  private:
@@ -44,8 +45,8 @@ inline void MemAddrStat::Clear() {
   pages_.clear();
 }
 
-void MemAddrStat::Fillout(double percents[], const unsigned int num) {
-  assert(pages_.empty() && num_blocks_ % num == 0);
+void MemAddrStat::Fillout(double percents[], const int num_buckets) {
+  assert(pages_.empty() && num_blocks_ % num_buckets == 0);
   // Count how many blocks are dirty in a page
   for (BlockSet::iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
@@ -53,21 +54,21 @@ void MemAddrStat::Fillout(double percents[], const unsigned int num) {
   }
 
   // Clear percents[] for page count
-  for (unsigned int i = 0; i < num; ++i) {
+  for (int i = 0; i < num_buckets; ++i) {
     percents[i] = 0;
   }
 
-  unsigned int pi;
+  int bi;
   for (PageMap::iterator it = pages_.begin();
       it != pages_.end(); ++it) {
     // num_blocks is exactly divisible by num
-    pi = (unsigned int)((it->second - 1) / (double)num_blocks_ * num);
-    assert(pi < num);
-    percents[pi] += 1;
+    bi = (int)((it->second - 1) / (double)num_blocks_ * num_buckets);
+    assert(bi >= 0 && bi < num_buckets);
+    percents[bi] += 1;
   }
 
   double num_pages = 0; // for integrity check
-  for (unsigned int i = 0; i < num; ++i) {
+  for (int i = 0; i < num_buckets; ++i) {
     num_pages += percents[i];
     percents[i] /= (pages_.size() ? pages_.size() : 1);
   }

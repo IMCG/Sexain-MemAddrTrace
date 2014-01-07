@@ -33,8 +33,11 @@ int main(int argc, const char* argv[]) {
   MemAddrStat stat(page_bits);
   MemRecord rec;
   uint64_t num_ins = epoch_ins;
+  uint64_t num_dirty = 0;
   while (parser.Next(&rec)) {
     if (rec.ins_seq >= num_ins) {
+      // for each epoch
+      num_dirty += stat.GetBlockNum();
       stat.Fillout(row, num_buckets);
       for (int i = 0; i < num_buckets; ++i) {
         sum[i] += row[i];
@@ -46,12 +49,17 @@ int main(int argc, const char* argv[]) {
   }
 
   uint64_t num_epochs = num_ins / epoch_ins - 1;
-  cout << "Num. Epochs=" << num_epochs << endl;
-  cout << 0;
+  cout << "# num_epochs=" << num_epochs << endl;
+  cout << "# dirty_rate=" << (double)num_dirty / num_epochs << endl;
   for (int i = 0; i < num_buckets; ++i) {
-    cout << '\t' << sum[i] / num_epochs;
+    sum[i] /= num_epochs; // contains average value
   }
-  cout << endl;
+  double left_sum = 0;
+  cout << 0 << '\t' << left_sum << endl;
+  for (int i = 0; i < num_buckets; ++i) {
+    left_sum += sum[i];
+    cout << (double)(i + 1) / num_buckets << '\t' << left_sum << endl;
+  }
 
   delete[] row;
   delete[] sum;
