@@ -8,10 +8,13 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cassert>
+#include <iostream>
 #include "zlib.h"
 
 #ifdef NDEBUG
-#define BUG_ON(v) (if (v) fprintf(stderr, "[Warn] %s, %d", __FILE__, __LINE__))
+#define BUG_ON(v) do { \
+    if (v) std::cerr << "[Warn]" << __FILE__ << ", " << __LINE__ << std::endl; \
+while(0)
 #else
 #define BUG_ON(v) (assert(!(v)))
 #endif
@@ -56,7 +59,7 @@ MemAddrParser::MemAddrParser(const char* file) {
       buffer_count() > 0x10000000 || (ptr_bytes_ & 0x60) != 0) {
     fclose(file_);
     file_ = NULL;
-    fprintf(stderr, "[Error] MemAddrParser init failed.\n");
+    std::cerr << "[Error] MemAddrParser init failed." << std::endl;
     return;
   }
   ins_array_ = new uint32_t[buffer_count()];
@@ -93,31 +96,18 @@ bool MemAddrParser::Replenish() {
   BUG_ON(fread(op_comp_, 1, op_len, file_) != op_len);
 
   uLong len;
-  int ret;
   len = buffer_count() * sizeof(uint32_t);
-  ret = uncompress((Bytef*)ins_array_, &len, ins_comp_, ins_len);
-  if (ret != Z_OK) {
-    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for ins_array_ "
-        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
-  }
+  BUG_ON(uncompress((Bytef*)ins_array_, &len, ins_comp_, ins_len) != Z_OK);
+
   len = buffer_count() * ptr_bytes_;
-  ret = uncompress((Bytef*)addr_array_, &len, addr_comp_, addr_len) != Z_OK;
-  if (ret != Z_OK) {
-    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for addr_array_ "
-        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
-  }
+  BUG_ON(uncompress((Bytef*)addr_array_, &len, addr_comp_, addr_len) != Z_OK);
+
   len = buffer_count() * sizeof(char);
-  ret = uncompress((Bytef*)op_array_, &len, op_comp_, op_len) != Z_OK;
-  if (ret != Z_OK) {
-    fprintf(stderr, "[Warn] MemAddrParser::Replenish(): for op_array_ "
-        "uncompress() failed: %d, ftell()=%lu\n", ret, ftell(file_));  
-  }
+  BUG_ON(uncompress((Bytef*)op_array_, &len, op_comp_, op_len) != Z_OK);
 
   i_next_ = 0;
   if (len / sizeof(char) != i_limit_) {
     i_limit_ = len / sizeof(char);
-    fprintf(stderr, "MemAddrParser::Replenish() partial buffer: %u\n",
-        i_limit_);
   }
   return true;
 }
@@ -146,11 +136,17 @@ bool MemAddrParser::Next(MemRecord* rec) {
   BUG_ON(rec->op != 'R' && rec->op != 'W');
 
   if (rec->ins_seq < last_ins_) {
-    fprintf(stderr, "[Warn] instruction sequence decreases: %lu\t%lu\t%c"
-        " < %lu\n", rec->ins_seq, rec->mem_addr, rec->op, last_ins_);
+    std::cerr << "[Warn] instruction sequence decreases: "
+        << last_ins_ << '\t' << rec->ins_seq << std::endl;
   }
   last_ins_ = rec->ins_seq;
+
+#ifdef STDOUT
+  std::cout << rec->ins_seq << '\t' << rec->mem_addr << '\t'
+      << rec->op << std::endl;
+#endif
   return ++i_next_;
 }
 
 #endif // SEXAIN_MEM_ADDR_PARSER_H_
+

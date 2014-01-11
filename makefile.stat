@@ -1,5 +1,5 @@
 CXX=g++
-FLAGS= -std=c++0x -O3 -Wall
+FLAGS= -std=c++0x -O3 -Wall #-DSTDOUT
 LIBS= -lz
 
 all: MemAddrStat.o
