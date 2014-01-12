@@ -68,7 +68,8 @@ FILE* test_out;
 VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
     tls_int32* tdata = TLS_INS_COUNT(tid);
-    if (!tdata) tdata = new tls_int32; // may exist in a forked child process
+    if (tdata) return; // may exist in a forked child process
+    tdata = new tls_int32;
     PIN_SetThreadData(tls_ins_count, tdata, tid);
 }
 
@@ -168,6 +169,11 @@ KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
     "file_size", "1024", "specify the max file size in MB");
 
+VOID BeforeFork(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
+{
+    mem_trace->Flush();
+}
+
 VOID AfterForkInChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
     delete mem_trace;
@@ -208,6 +214,7 @@ int main(int argc, char *argv[])
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
+    PIN_AddForkFunction(FPOINT_BEFORE, BeforeFork, 0);
     PIN_AddForkFunction(FPOINT_AFTER_IN_CHILD, AfterForkInChild, 0);
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);

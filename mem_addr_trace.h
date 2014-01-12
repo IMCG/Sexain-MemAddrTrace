@@ -17,7 +17,7 @@
 
 class MemAddrTrace {
  public:
-  MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_size_mb); 
+  MemAddrTrace(UINT32 buf_len, const char* file, UINT32 max_size_mb); 
   ~MemAddrTrace();
  
   bool Input(UINT32 ins_seq, VOID* addr, char op);
@@ -45,10 +45,10 @@ class MemAddrTrace {
   void* op_compressed_;
 };
 
-MemAddrTrace::MemAddrTrace(UINT32 buf_size, const char* file, UINT32 max_mb):
-    buf_len_(buf_size), end_(0) {
+MemAddrTrace::MemAddrTrace(UINT32 buf_len, const char* file, UINT32 max_mb):
+    buf_len_(buf_len), end_(0) {
   file_ = fopen(file, "wb");
-  fwrite(&buf_size, sizeof(buf_size), 1, file_);
+  fwrite(&buf_len_, sizeof(buf_len_), 1, file_);
 
   UINT32 ptr_bytes = sizeof(VOID*);
   fwrite(&ptr_bytes, sizeof(ptr_bytes), 1, file_);
@@ -99,6 +99,7 @@ bool MemAddrTrace::DoFlush() {
   BUG_ON(fwrite(&len, sizeof(len), 1, file_) != 1);
   BUG_ON(fwrite(op_compressed_, 1, len, file_) != len);
 
+  fflush(file_);
   end_ = 0;
   return true;
 }
