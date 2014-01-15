@@ -38,6 +38,7 @@ END_LEGAL */
 #include <string>
 #include <atomic>
 #include "pin.H"
+#include "pinplay.H"
 #include "mem_addr_trace.h"
 
 #define CACHE_LINE_SIZE 64 // bytes
@@ -169,6 +170,13 @@ KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
     "file_size", "1024", "specify the max file size in MB");
 
+PINPLAY_ENGINE pinplay_engine;
+KNOB<BOOL> KnobPinPlayLogger(KNOB_MODE_WRITEONCE, "pintool",
+    "log", "0", "Activate the pinplay logger");
+
+KNOB<BOOL> KnobPinPlayReplayer(KNOB_MODE_WRITEONCE, "pintool",
+    "replay", "0", "Activate the pinplay replayer");
+
 VOID BeforeFork(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
     mem_trace->Flush();
@@ -203,6 +211,7 @@ INT32 Usage()
 int main(int argc, char *argv[])
 {
     if (PIN_Init(argc, argv)) return Usage();
+    pinplay_engine.Activate(argc, argv, KnobPinPlayLogger, KnobPinPlayReplayer);
 
     std::string file_name(KnobFilePrefix.Value());
     file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");

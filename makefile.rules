@@ -52,8 +52,15 @@ DLL_ROOTS :=
 # This defines any static libraries (archives), that need to be built.
 LIB_ROOTS :=
 
-TOOL_CXXFLAGS += -std=c++0x #-DTEST
-TOOL_LIBS += -lz
+PINPLAY_HOME=$(PIN_ROOT)/extras/pinplay
+PINPLAY_INCLUDE_HOME=$(PINPLAY_HOME)/include
+PINPLAY_LIB_HOME=$(PINPLAY_HOME)/lib/$(TARGET)
+EXT_LIB_HOME=$(PINPLAY_HOME)/lib-ext/$(TARGET)
+
+TOOL_CXXFLAGS += -I$(PINPLAY_INCLUDE_HOME) -std=c++0x #-DTEST
+
+TOOL_LPATHS += -L$(PINPLAY_LIB_HOME) -L$(EXT_LIB_HOME)
+PINPLAY_LIBS += -lpinplay -lbz2 -lz
 
 ##############################################################
 #
@@ -75,6 +82,9 @@ TOOL_LIBS += -lz
 # This section contains the build rules for all binaries that have special build rules.
 # See makefile.default.rules for the default build rules.
 
-$(OBJDIR)MemAddrTrace$(OBJ_SUFFIX): MemAddrTrace.cpp mem_addr_trace.h
+$(OBJDIR)$(TEST_TOOL_ROOTS)$(OBJ_SUFFIX): MemAddrTrace.cpp mem_addr_trace.h
 	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)$(TEST_TOOL_ROOTS)$(PINTOOL_SUFFIX): $(OBJDIR)MemAddrTrace$(OBJ_SUFFIX) mem_addr_trace.h
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(PINPLAY_LIBS) $(TOOL_LIBS)
 
