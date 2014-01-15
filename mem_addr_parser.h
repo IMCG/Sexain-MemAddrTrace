@@ -13,7 +13,7 @@
 
 #ifdef NDEBUG
 #define BUG_ON(v) do { \
-    if (v) std::cerr << "[Warn]" << __FILE__ << ", " << __LINE__ << std::endl; \
+  if (v) std::cerr << "[Warn]" << __FILE__ << ", " << __LINE__ << std::endl; \
 while(0)
 #else
 #define BUG_ON(v) (assert(!(v)))
