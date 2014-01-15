@@ -43,67 +43,66 @@ END_LEGAL */
 
 #define CACHE_LINE_SIZE 64 // bytes
 
-static MemAddrTrace * mem_trace;
-
+static PIN_LOCK g_lock;
+static MemAddrTrace * g_mem_trace;
 static std::atomic_uint g_ins_count;
-static TLS_KEY tls_ins_count;
 
-class tls_int32
+/* Added command line option: buffer size */
+KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
+    "buffer_size", "1048576", "specify the number of records to buffer");
+
+KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
+    "file_prefix", "mem_addr", "specify prefix of output file name");
+
+KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
+    "file_size", "1024", "specify the max file size in MB");
+
+PINPLAY_ENGINE pinplay_engine;
+KNOB<BOOL> KnobPinPlayLogger(KNOB_MODE_WRITEONCE, "pintool",
+    "log", "0", "Activate the pinplay logger");
+
+KNOB<BOOL> KnobPinPlayReplayer(KNOB_MODE_WRITEONCE, "pintool",
+    "replay", "0", "Activate the pinplay replayer");
+
+VOID InitGlobal()
 {
-  public:
-    UINT32 value() { return value_; }
-    void set_value(UINT32 v) { value_ = v; }
-  private:
-    UINT32 value_;
-    // Force each TLS data to be in its own data cache line
-    UINT8 pad_[CACHE_LINE_SIZE - sizeof(value_)];
-};
+    PIN_InitLock(&g_lock);
 
-#define TLS_INS_COUNT(tid) \
-    (static_cast<tls_int32*>(PIN_GetThreadData(tls_ins_count, tid)))
+    std::string file_name(KnobFilePrefix.Value());
+    file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
+    g_mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
+        file_name.c_str(), KnobFileSize.Value());
 
-#ifdef TEST
-FILE* test_out;
-#endif
-
-VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
-{
-    tls_int32* tdata = TLS_INS_COUNT(tid);
-    if (tdata) return; // may exist in a forked child process
-    tdata = new tls_int32;
-    PIN_SetThreadData(tls_ins_count, tdata, tid);
-}
-
-VOID ThreadFini(THREADID tid, const CONTEXT *ctxt, INT32 flags, VOID *v)
-{
-    delete TLS_INS_COUNT(tid);
+    g_ins_count = 0;
 }
 
 VOID InsCount(THREADID tid)
 {
-    TLS_INS_COUNT(tid)->set_value(++g_ins_count);
+    ++g_ins_count;
 }
 
 VOID RecordMemRead(THREADID tid, VOID * addr)
 {
-    if (!mem_trace->Input(TLS_INS_COUNT(tid)->value(), addr, 'R')) {
+    PIN_GetLock(&g_lock, tid);
+    if (!g_mem_trace->Input(g_ins_count, addr, 'R')) {
         PIN_Detach();
     }
 #ifdef TEST
-    fprintf(test_out, "%u\t%llu\t%c\n",
-            TLS_INS_COUNT(tid)->value(), (unsigned long long)addr, 'R');
+    std::cout << g_ins_count << '\t' << addr << "\tR" << std::endl;
 #endif
+    PIN_ReleaseLock(&g_lock);
 }
 
 VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
-    if (!mem_trace->Input(TLS_INS_COUNT(tid)->value(), addr, 'W')) {
+    PIN_GetLock(&g_lock, tid);
+    if (!g_mem_trace->Input(g_ins_count, addr, 'W')) {
         PIN_Detach();
     }
 #ifdef TEST
-    fprintf(test_out, "%u\t%llu\t%c\n",
-            TLS_INS_COUNT(tid)->value(), (unsigned long long)addr, 'W');
+    std::cout << g_ins_count << '\t' << addr << "\tW" << std::endl;
 #endif
+    PIN_ReleaseLock(&g_lock);
 }
 
 // Is called for every instruction and instruments reads and writes
@@ -148,49 +147,28 @@ VOID Instruction(INS ins, VOID *v)
 
 VOID Detach(VOID *v)
 {
-    delete mem_trace;
-#ifdef TEST
-    fclose(test_out);
-#endif 
+    delete g_mem_trace;
 }
 
 VOID Fini(INT32 code, VOID *v)
 {
-    mem_trace->Flush();
+    PIN_GetLock(&g_lock, 0);
+    g_mem_trace->Flush();
+    PIN_ReleaseLock(&g_lock);
     Detach(v);
 }
 
-/* Added command line option: buffer size */
-KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
-    "buffer_size", "1048576", "specify the number of records to buffer");
-
-KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
-    "file_prefix", "mem_addr", "specify prefix of output file name");
-
-KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
-    "file_size", "1024", "specify the max file size in MB");
-
-PINPLAY_ENGINE pinplay_engine;
-KNOB<BOOL> KnobPinPlayLogger(KNOB_MODE_WRITEONCE, "pintool",
-    "log", "0", "Activate the pinplay logger");
-
-KNOB<BOOL> KnobPinPlayReplayer(KNOB_MODE_WRITEONCE, "pintool",
-    "replay", "0", "Activate the pinplay replayer");
-
-VOID BeforeFork(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
+VOID BeforeFork(THREADID tid, const CONTEXT* ctxt, VOID * arg)
 {
-    mem_trace->Flush();
+    PIN_GetLock(&g_lock, tid);
+    g_mem_trace->Flush();
+    PIN_ReleaseLock(&g_lock);
 }
 
 VOID AfterForkInChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
-    delete mem_trace;
-
-    std::string file_name(KnobFilePrefix.Value());
-    file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
-    mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
-        file_name.c_str(), KnobFileSize.Value());
-    g_ins_count = 0;
+    delete g_mem_trace;
+    InitGlobal();
 }
 
 /* ===================================================================== */
@@ -213,16 +191,8 @@ int main(int argc, char *argv[])
     if (PIN_Init(argc, argv)) return Usage();
     pinplay_engine.Activate(argc, argv, KnobPinPlayLogger, KnobPinPlayReplayer);
 
-    std::string file_name(KnobFilePrefix.Value());
-    file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
-    mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
-        file_name.c_str(), KnobFileSize.Value());
-#ifdef TEST
-    test_out = fopen(file_name.append(".test").c_str(), "w");
-#endif
+    InitGlobal();
 
-    PIN_AddThreadStartFunction(ThreadStart, 0);
-    PIN_AddThreadFiniFunction(ThreadFini, 0);
     PIN_AddForkFunction(FPOINT_BEFORE, BeforeFork, 0);
     PIN_AddForkFunction(FPOINT_AFTER_IN_CHILD, AfterForkInChild, 0);
     INS_AddInstrumentFunction(Instruction, 0);
