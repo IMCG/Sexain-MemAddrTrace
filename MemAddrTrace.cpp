@@ -42,20 +42,30 @@ END_LEGAL */
 #include "mem_addr_trace.h"
 
 #define CACHE_LINE_SIZE 64 // bytes
+#define MEGA 1000000
 
 static PIN_LOCK g_lock;
 static MemAddrTrace * g_mem_trace;
-static std::atomic_uint g_ins_count;
+static std::atomic_uint_fast64_t g_ins_count;
+static UINT64 g_ins_lower;
+static UINT64 g_ins_upper;
+static volatile bool g_switch;
 
 /* Added command line option: buffer size */
-KNOB<UINT32> KnobBufferSize(KNOB_MODE_WRITEONCE, "pintool",
-    "buffer_size", "1048576", "specify the number of records to buffer");
+KNOB<UINT32> KnobBufferLength(KNOB_MODE_WRITEONCE, "pintool",
+    "buffer_length", "1048576", "specify the number of records to buffer");
 
 KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
     "file_prefix", "mem_addr", "specify prefix of output file name");
 
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
-    "file_size", "1024", "specify the max file size in MB");
+    "file_size", "8192", "specify the max file size in MiB");
+
+KNOB<UINT64> KnobInsLower(KNOB_MODE_WRITEONCE, "pintool",
+    "ins_lower", "0", "specify the number of mega-instructions to skip");
+
+KNOB<UINT64> KnobInsUpper(KNOB_MODE_WRITEONCE, "pintool",
+    "ins_upper", "1000000", "specify the max number of mega-instructions");
 
 PINPLAY_ENGINE pinplay_engine;
 KNOB<BOOL> KnobPinPlayLogger(KNOB_MODE_WRITEONCE, "pintool",
@@ -70,19 +80,24 @@ VOID InitGlobal()
 
     std::string file_name(KnobFilePrefix.Value());
     file_name.append("_").append(std::to_string(PIN_GetPid())).append(".trace");
-    g_mem_trace = new MemAddrTrace(KnobBufferSize.Value(),
+    g_mem_trace = new MemAddrTrace(KnobBufferLength.Value(),
         file_name.c_str(), KnobFileSize.Value());
 
     g_ins_count = 0;
+    g_ins_lower = KnobInsLower.Value() * MEGA;
+    g_ins_upper = KnobInsUpper.Value() * MEGA;
+    g_switch = false;
 }
 
 VOID InsCount(THREADID tid)
 {
-    ++g_ins_count;
+    UINT64 ins_count = ++g_ins_count; // starts from 1
+    g_switch = (g_ins_lower < ins_count) && (ins_count < g_ins_upper);
 }
 
 VOID RecordMemRead(THREADID tid, VOID * addr)
 {
+    if (!g_switch) return;
     PIN_GetLock(&g_lock, tid);
     if (!g_mem_trace->Input(g_ins_count, addr, 'R')) {
         PIN_Detach();
@@ -95,6 +110,7 @@ VOID RecordMemRead(THREADID tid, VOID * addr)
 
 VOID RecordMemWrite(THREADID tid, VOID * addr)
 {
+    if (!g_switch) return;
     PIN_GetLock(&g_lock, tid);
     if (!g_mem_trace->Input(g_ins_count, addr, 'W')) {
         PIN_Detach();
