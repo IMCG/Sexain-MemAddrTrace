@@ -1,5 +1,5 @@
 // mem_addr_stat.h
-// Copyright (c) Jinglei Ren <jinglei.ren@stanzax.org>
+// Copyright (c) 2013 Jinglei Ren <jinglei.ren@stanzax.org>
 
 #ifndef SEXAIN_MEM_ADDR_STAT_H_
 #define SEXAIN_MEM_ADDR_STAT_H_

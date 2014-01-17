@@ -47,8 +47,8 @@ END_LEGAL */
 static PIN_LOCK g_lock;
 static MemAddrTrace * g_mem_trace;
 static std::atomic_uint_fast64_t g_ins_count;
-static UINT64 g_ins_lower;
-static UINT64 g_ins_upper;
+static UINT64 g_ins_skip;
+static UINT64 g_ins_max;
 static volatile bool g_switch;
 
 /* Added command line option: buffer size */
@@ -61,11 +61,11 @@ KNOB<string> KnobFilePrefix(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<UINT32> KnobFileSize(KNOB_MODE_WRITEONCE, "pintool",
     "file_size", "8192", "specify the max file size in MiB");
 
-KNOB<UINT64> KnobInsLower(KNOB_MODE_WRITEONCE, "pintool",
-    "ins_lower", "0", "specify the number of mega-instructions to skip");
+KNOB<UINT64> KnobInsSkip(KNOB_MODE_WRITEONCE, "pintool",
+    "ins_skip", "0", "specify the number of mega-instructions to skip");
 
-KNOB<UINT64> KnobInsUpper(KNOB_MODE_WRITEONCE, "pintool",
-    "ins_upper", "1000000", "specify the max number of mega-instructions");
+KNOB<UINT64> KnobInsMax(KNOB_MODE_WRITEONCE, "pintool",
+    "ins_max", "1000000", "specify the max number of mega-instructions");
 
 PINPLAY_ENGINE pinplay_engine;
 KNOB<BOOL> KnobPinPlayLogger(KNOB_MODE_WRITEONCE, "pintool",
@@ -84,15 +84,15 @@ VOID InitGlobal()
         file_name.c_str(), KnobFileSize.Value());
 
     g_ins_count = 0;
-    g_ins_lower = KnobInsLower.Value() * MEGA;
-    g_ins_upper = KnobInsUpper.Value() * MEGA;
+    g_ins_skip = KnobInsSkip.Value() * MEGA;
+    g_ins_max = KnobInsMax.Value() * MEGA + (MEGA / 10);
     g_switch = false;
 }
 
 VOID InsCount(THREADID tid)
 {
     UINT64 ins_count = ++g_ins_count; // starts from 1
-    g_switch = (g_ins_lower < ins_count) && (ins_count < g_ins_upper);
+    g_switch = (g_ins_skip < ins_count) && (ins_count < g_ins_max);
 }
 
 VOID RecordMemRead(THREADID tid, VOID * addr)

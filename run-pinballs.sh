@@ -21,7 +21,7 @@ do
     -t obj-intel64/MemAddrTrace.so \
     -replay -replay:basename $DIR/$PINBALL/pinball \
     -file_prefix traces/$PINBALL \
-    -buffer_length $BUF_LEN -ins_lower $SKIP -ins_upper $MAX \
+    -buffer_length $BUF_LEN -ins_skip $SKIP -ins_max $MAX \
     -- $PIN/extras/pinplay/bin/intel64/nullapp > /dev/null 2>>err.log &
 done
 
