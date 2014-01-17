@@ -2,8 +2,8 @@
 
 PIN=~/pin
 BUF_LEN=8388608
-SKIP=1000000
-MAX=10000000
+SKIP=100000
+MAX=1000000
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 DIR"
@@ -12,6 +12,7 @@ fi
 
 DIR=$1
 
+sudo sh -c "echo 0 > /proc/sys/kernel/yama/ptrace_scope"
 mkdir -p traces
 
 for PINBALL in `ls $DIR`
