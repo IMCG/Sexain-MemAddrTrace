@@ -1,8 +1,0 @@
-CXX=g++
-FLAGS= -std=c++0x -O3 -Wall #-DSTDOUT
-LIBS= -lz
-
-all: MemAddrStat.o
-
-MemAddrStat.o: MemAddrStat.cpp epoch_engine.h epoch_visitor.h mem_addr_parser.h
-	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)

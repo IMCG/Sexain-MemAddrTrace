@@ -1,0 +1,8 @@
+CXX=g++
+FLAGS= -std=c++0x -O3 -Wall #-DSTDOUT
+LIBS= -lz
+
+all: MemAddrStats.o
+
+MemAddrStats.o: MemAddrStats.cpp epoch_engine.h epoch_visitor.h mem_addr_parser.h
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)

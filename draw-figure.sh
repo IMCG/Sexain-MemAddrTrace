@@ -16,5 +16,5 @@ set yrange [0:1]
 set xlabel 'Dirty Proportion'
 set xrange [0:1]
 
-plot "$file_pre-8.stat" u 1:2 smooth csplines t '256-byte pages'
+plot "$file_pre-8.stats" u 1:2 smooth csplines t '256-byte pages'
 EOF

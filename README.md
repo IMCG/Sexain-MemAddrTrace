@@ -11,7 +11,7 @@ $ make PIN_ROOT=<path to Pin kit> obj-intel64/MemAddrTrace.so
 ```
 To make trace parser and analyser:
 ```
-$ make -f makefile.stat
+$ make -f makefile.stats
 ```
 To run an application with Pintool:
 ```

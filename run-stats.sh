@@ -16,6 +16,6 @@ max_bits=$5
 files=`ls "$file_pre"*.trace`
 
 for file in $files; do
-  ./MemAddrStat.o $file $min_mega $max_mega $min_bits $max_bits \
-      > $file.stat 2>>err.log &
+  ./MemAddrStats.o $file $min_mega $max_mega $min_bits $max_bits \
+      > $file.stats 2>>err.log &
 done

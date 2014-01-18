@@ -1,4 +1,4 @@
-// MemAddrStat.cpp
+// MemAddrStats.cpp
 // Copyright (c) 2013 Jinglei Ren <jinglei.ren@stanzax.org>
 
 #include <cerrno>
