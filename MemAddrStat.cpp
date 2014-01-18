@@ -31,8 +31,11 @@ int main(int argc, const char* argv[]) {
   }
 
   PageDirtyRatioVisitor pdr_visitor(page_bits);
+  DirtyCountVisitor pdc_visitor;
+
   EpochEngine engine(epoch_ins);
   engine.AddVisitor(&pdr_visitor);
+  engine.AddVisitor(&pdc_visitor);
 
   MemRecord rec;
   while (parser.Next(&rec)) {
@@ -40,6 +43,8 @@ int main(int argc, const char* argv[]) {
   }
 
   cout << "# num_epochs=" << engine.num_epochs() << endl;
+  cout << "# dirty_rate="
+      << (double)pdc_visitor.count() / engine.num_epochs() << endl;
   BUG_ON(pdr_visitor.Fillout(results, num_buckets) != engine.num_epochs());
   double left_sum = 0;
   cout << 0 << '\t' << left_sum << endl;
