@@ -16,14 +16,6 @@ max_bits=$5
 files=`ls "$file_pre"*.trace`
 
 for file in $files; do
-  for ((ins=min_mega; ins<=max_mega; ins*=10)); do
-    for ((bits=min_bits; bits <= max_bits; bits+=2)); do
-      num_buckets=$((2**(bits-6)))
-      if [ $num_buckets -gt 32 ]; then
-        num_buckets=32
-      fi
-      ./MemAddrStat.o $file $ins $bits $num_buckets \
-          > $file-$ins-$bits.stat 2>>err.log &
-    done
-  done
+  ./MemAddrStat.o $file $min_mega $max_mega $min_bits $max_bits \
+      > $file.stat 2>>err.log &
 done

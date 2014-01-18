@@ -16,10 +16,10 @@ class EpochEngine {
   void AddVisitor(EpochVisitor* v) { visitors_.push_back(v); }
   void Input(const MemRecord& rec); // assumes increasing ins_seq
   int num_epochs() const { return num_epochs_; }
-  const std::vector<EpochVisitor*>& visitors() const { return visitors_; };
-  
+  uint64_t epoch_ins() const { return epoch_ins_; }
+ 
  private:
-  const uint64_t epoch_ins_;
+  uint64_t epoch_ins_;
   uint64_t epoch_max_;
   int num_epochs_;
   std::vector<EpochVisitor*> visitors_;
@@ -36,7 +36,7 @@ void EpochEngine::Input(const MemRecord& rec) {
       Reset();
       ++num_epochs_;
     }
-    epoch_max_ = (rec.ins_seq / epoch_ins_ + 1) * epoch_ins_;
+    epoch_max_ = (rec.ins_seq / epoch_ins() + 1) * epoch_ins();
   }
   blocks_[rec.mem_addr >> CACHE_BLOCK_BITS] += 1;
 }

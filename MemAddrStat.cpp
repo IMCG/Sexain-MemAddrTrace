@@ -9,48 +9,77 @@
 #include "mem_addr_parser.h"
 #include "epoch_engine.h"
 
+#define INS_BASE 10
+#define BIT_STEP 2
 #define MEGA 1000000
 
 using namespace std;
 
+static inline int NumBuckets(int page_bits) {
+  int buckets = 1 << (page_bits - CACHE_BLOCK_BITS);
+  return buckets > 16 ? 16 : buckets;
+}
+
 int main(int argc, const char* argv[]) {
-  if (argc != 5) {
+  if (argc != 6) {
     cerr << "Usage: " << argv[0]
-        << " FILE EPOCH_MEGA_INS PAGE_BITS NUM_BUCKETS" << endl;
+        << " FILE MIN_MEGA_INS MAX_MEGA_INS"
+        << " MIN_PAGE_BITS MAX_PAGE_BITS" << endl;
     return EINVAL;
   }
 
   MemAddrParser parser(argv[1]);
-  const uint64_t epoch_ins = atoll(argv[2]) * MEGA;
-  const int page_bits = atoi(argv[3]);
-  const int num_buckets = atoi(argv[4]);
+  const uint64_t min_ins = atoi(argv[2]) * MEGA;
+  const uint64_t max_ins = atoi(argv[3]) * MEGA;
+  const int min_bits = atoi(argv[4]);
+  const int max_bits = atoi(argv[5]);
 
-  double* results = new double[num_buckets];
-  for (int i = 0; i < num_buckets; ++i) {
-    results[i] = 0;
+  vector<EpochEngine> engines;
+  for (uint64_t ins = min_ins; ins <= max_ins; ins *= INS_BASE) {
+    engines.push_back(ins);
   }
 
-  PageDirtyRatioVisitor pdr_visitor(page_bits);
-  DirtyCountVisitor pdc_visitor;
+  vector< vector<DirtyRatioVisitor> > dr_visitors;
+  for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
+    dr_visitors.push_back(vector<DirtyRatioVisitor>(engines.size(), bits));
+  }
 
-  EpochEngine engine(epoch_ins);
-  engine.AddVisitor(&pdr_visitor);
-  engine.AddVisitor(&pdc_visitor);
+  vector<BlockCountVisitor> bc_visitors(engines.size());
 
+  // Register visitors after they are stably allocated.
+  for (vector< vector<DirtyRatioVisitor> >::iterator it = dr_visitors.begin();
+      it != dr_visitors.end(); ++it) {
+    for (unsigned int i = 0; i < engines.size(); ++i) {
+      engines[i].AddVisitor(&(*it)[i]);
+    }
+  }
+  for (unsigned int i = 0; i < engines.size(); ++i) {
+    engines[i].AddVisitor(&bc_visitors[i]);
+  }
+ 
   MemRecord rec;
   while (parser.Next(&rec)) {
-    engine.Input(rec);
+    for (vector<EpochEngine>::iterator it = engines.begin();
+        it != engines.end(); ++it) {
+      it->Input(rec);
+    }
   }
 
-  cout << "# num_epochs=" << engine.num_epochs() << endl;
-  cout << "# dirty_rate="
-      << (double)pdc_visitor.count() / engine.num_epochs() << endl;
-  BUG_ON(pdr_visitor.Fillout(results, num_buckets) != engine.num_epochs());
-  double left_sum = 0;
-  cout << 0 << '\t' << left_sum << endl;
-  for (int i = 0; i < num_buckets; ++i) {
-    left_sum += results[i];
-    cout << (double)(i + 1) / num_buckets << '\t' << left_sum << endl;
+  double* results = new double[NumBuckets(max_bits)];
+  for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
+    int buckets = NumBuckets(bits);
+    for (unsigned int i = 0; i < engines.size(); ++i) {
+      cout << "# num_epochs=" << engines[i].num_epochs() << endl;
+      cout << "# dirty_rate="
+          << (double)bc_visitors[i].count() / engines[i].num_epochs() << endl;
+      dr_visitors[(bits - min_bits) / BIT_STEP][i].Fillout(results, buckets);
+      double left_sum = 0;
+      cout << 0 << '\t' << left_sum << endl;
+      for (int i = 0; i < buckets; ++i) {
+        left_sum += results[i];
+        cout << (double)(i + 1) / buckets << '\t' << left_sum << endl;
+      }
+    }
   }
 
   delete[] results;

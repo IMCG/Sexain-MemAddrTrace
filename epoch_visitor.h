@@ -32,7 +32,7 @@ class DirtyRatioVisitor : public EpochVisitor {
  public:
   DirtyRatioVisitor(int page_bits);
   void Visit(const BlockSet& blocks);
-  int Fillout(double percents[], const int num_buckets); // adding to percents
+  int Fillout(double percents[], const int num_buckets);
  private:
   const int page_bits_;
   const int num_blocks_;
@@ -69,6 +69,7 @@ void DirtyRatioVisitor::Visit(const BlockSet& blocks) {
 
 int DirtyRatioVisitor::Fillout(double percents[], const int n) {
   assert(num_blocks_ % n == 0);
+  for (int i = 0; i < n; ++i) percents[i] = 0.0;
   if (num_visits_) {
     int unit = num_blocks_ / n;
     for (int i = 0; i < num_blocks_; ++i) {
