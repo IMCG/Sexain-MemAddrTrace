@@ -15,7 +15,9 @@ class EpochEngine {
       num_epochs_(0) { }
   void AddVisitor(EpochVisitor* v) { visitors_.push_back(v); }
   void Input(const MemRecord& rec); // assumes increasing ins_seq
-  int num_epochs() { return num_epochs_; }
+  int num_epochs() const { return num_epochs_; }
+  const std::vector<EpochVisitor*>& visitors() const { return visitors_; };
+  
  private:
   const uint64_t epoch_ins_;
   uint64_t epoch_max_;

@@ -19,18 +19,18 @@ class EpochVisitor {
   virtual void Visit(const BlockSet& blocks) = 0;
 };
 
-class DirtyCountVisitor : public EpochVisitor {
+class BlockCountVisitor : public EpochVisitor {
  public:
-  DirtyCountVisitor() : count_(0) { }
+  BlockCountVisitor() : count_(0) { }
   void Visit(const BlockSet& blocks) { count_ += blocks.size(); }
   uint64_t count() { return count_; }
  private:
   uint64_t count_;
 };
 
-class PageDirtyRatioVisitor : public EpochVisitor {
+class DirtyRatioVisitor : public EpochVisitor {
  public:
-  PageDirtyRatioVisitor(int page_bits);
+  DirtyRatioVisitor(int page_bits);
   void Visit(const BlockSet& blocks);
   int Fillout(double percents[], const int num_buckets); // adding to percents
  private:
@@ -42,16 +42,16 @@ class PageDirtyRatioVisitor : public EpochVisitor {
 
 // Implementations
 
-// PageDirtyRatioVisitor
+// DirtyRatioVisitor
 
-PageDirtyRatioVisitor::PageDirtyRatioVisitor(int page_bits) :
+DirtyRatioVisitor::DirtyRatioVisitor(int page_bits) :
     page_bits_(page_bits), num_blocks_(1 << (page_bits - CACHE_BLOCK_BITS)),
     sum_ratios_(num_blocks_, 0.0) {
   assert(num_blocks_);
   num_visits_ = 0;
 }
 
-void PageDirtyRatioVisitor::Visit(const BlockSet& blocks) {
+void DirtyRatioVisitor::Visit(const BlockSet& blocks) {
   std::unordered_map<uint64_t, int> pages;
   // Count how many blocks are dirty in a page
   for (BlockSet::const_iterator it = blocks.begin();
@@ -67,7 +67,7 @@ void PageDirtyRatioVisitor::Visit(const BlockSet& blocks) {
   ++num_visits_;
 }
 
-int PageDirtyRatioVisitor::Fillout(double percents[], const int n) {
+int DirtyRatioVisitor::Fillout(double percents[], const int n) {
   assert(num_blocks_ % n == 0);
   if (num_visits_) {
     int unit = num_blocks_ / n;
