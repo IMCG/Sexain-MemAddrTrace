@@ -7,7 +7,7 @@
 #include <fstream>
 #include <string>
 #include "mem_addr_parser.h"
-#include "mem_addr_stat.h"
+#include "epoch_engine.h"
 
 #define MEGA 1000000
 
@@ -25,50 +25,29 @@ int main(int argc, const char* argv[]) {
   const int page_bits = atoi(argv[3]);
   const int num_buckets = atoi(argv[4]);
 
-  double* row = new double[num_buckets];
-  double* sum = new double[num_buckets];
+  double* results = new double[num_buckets];
   for (int i = 0; i < num_buckets; ++i) {
-    sum[i] = 0;
+    results[i] = 0;
   }
 
-  MemAddrStat stat(page_bits);
+  PageDirtyRatioVisitor pdr_visitor(page_bits);
+  EpochEngine engine(epoch_ins);
+  engine.AddVisitor(&pdr_visitor);
+
   MemRecord rec;
-  uint64_t epoch_max = epoch_ins;
-  uint64_t num_dirty = 0;
-  int num_epochs = 0;
-  if (parser.Next(&rec)) {
-    if (rec.op == 'W') stat.Input(rec.mem_addr);
-    epoch_max = (rec.ins_seq / epoch_ins + 1) * epoch_ins;
-  }
   while (parser.Next(&rec)) {
-    if (rec.ins_seq > epoch_max) {
-      // entering next epoch
-      num_dirty += stat.GetBlockNum();
-      stat.Fillout(row, num_buckets);
-      ++num_epochs;
-      for (int i = 0; i < num_buckets; ++i) {
-        sum[i] += row[i];
-      }
-      epoch_max += epoch_ins;  
-      stat.Clear();
-    }
-    // for each record
-    if (rec.op == 'W') stat.Input(rec.mem_addr);
+    engine.Input(rec);
   }
 
-  cout << "# num_epochs=" << num_epochs << endl;
-  cout << "# dirty_rate=" << (double)num_dirty / num_epochs << endl;
-  for (int i = 0; i < num_buckets; ++i) {
-    sum[i] /= num_epochs; // contains average value
-  }
+  cout << "# num_epochs=" << engine.num_epochs() << endl;
+  BUG_ON(pdr_visitor.Fillout(results, num_buckets) != engine.num_epochs());
   double left_sum = 0;
   cout << 0 << '\t' << left_sum << endl;
   for (int i = 0; i < num_buckets; ++i) {
-    left_sum += sum[i];
+    left_sum += results[i];
     cout << (double)(i + 1) / num_buckets << '\t' << left_sum << endl;
   }
 
-  delete[] row;
-  delete[] sum;
+  delete[] results;
   return 0;
 }
