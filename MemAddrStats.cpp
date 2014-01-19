@@ -68,11 +68,12 @@ int main(int argc, const char* argv[]) {
   double* results = new double[NumBuckets(max_bits)];
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
     int buckets = NumBuckets(bits);
-    for (unsigned int i = 0; i < engines.size(); ++i) {
-      cout << "# num_epochs=" << engines[i].num_epochs() << endl;
+    int bi = (bits - min_bits) / BIT_STEP; 
+    for (unsigned int ei = 0; ei < engines.size(); ++ei) {
+      cout << "# num_epochs=" << engines[ei].num_epochs() << endl;
       cout << "# dirty_rate="
-          << (double)bc_visitors[i].count() / engines[i].num_epochs() << endl;
-      dr_visitors[(bits - min_bits) / BIT_STEP][i].Fillout(results, buckets);
+          << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
+      dr_visitors[bi][ei].FillDirtyRatios(results, buckets);
       double left_sum = 0;
       cout << 0 << '\t' << left_sum << endl;
       for (int i = 0; i < buckets; ++i) {

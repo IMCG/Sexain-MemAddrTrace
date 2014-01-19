@@ -45,19 +45,22 @@ class DirtyRatioVisitor : public PageVisitor {
  public:
   DirtyRatioVisitor(int page_bits);
   void Visit(const BlockSet& blocks);
-  int Fillout(double percents[], const int num_buckets);
+  int FillDirtyRatios(double percents[], const int num_buckets);
+ protected:
+  typedef std::unordered_map<uint64_t, int> PageDirts;
+  PageDirts page_dirts_;
  private:
   std::vector<double> sum_ratios_;
 };
 
-class PageStatsVisitor : public PageVisitor {
+class PageStatsVisitor : public DirtyRatioVisitor {
  public:
   PageStatsVisitor(int page_bits);
   void Visit(const BlockSet& blocks);
-  int Fillout(double percents[], const int num_buckets);
+  int FillPageStats(int counts[], const int num_buckets);
  private:
   struct PageStats { int blocks; int epochs; };
-  std::unordered_map<uint64_t, PageStats> pages;
+  std::unordered_map<uint64_t, PageStats> sum_stats_;
 };
 
 // Implementations
@@ -82,21 +85,21 @@ DirtyRatioVisitor::DirtyRatioVisitor(int page_bits) :
 
 void DirtyRatioVisitor::Visit(const BlockSet& blocks) {
   PageVisitor::Visit(blocks);
-  std::unordered_map<uint64_t, int> pages;
   // Count how many blocks are dirty in a page
+  page_dirts_.clear();
   for (BlockSet::const_iterator it = blocks.begin();
       it != blocks.end(); ++it) {
-    pages[(it->first) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
+    page_dirts_[(it->first) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
   }
-  if (pages.empty()) return;
+  if (page_dirts_.empty()) return;
 
-  for (std::unordered_map<uint64_t, int>::iterator it = pages.begin();
-      it != pages.end(); ++it) {
-    sum_ratios_[it->second - 1] += (double)1 / pages.size();
+  for (PageDirts::iterator it = page_dirts_.begin();
+      it != page_dirts_.end(); ++it) {
+    sum_ratios_[it->second - 1] += (double)1 / page_dirts_.size();
   }
 }
 
-int DirtyRatioVisitor::Fillout(double percents[], const int n) {
+int DirtyRatioVisitor::FillDirtyRatios(double percents[], const int n) {
   assert(page_blocks() % n == 0);
   for (int i = 0; i < n; ++i) percents[i] = 0.0;
   if (num_visits()) {
