@@ -66,7 +66,8 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  double* results = new double[NumBuckets(max_bits)];
+  double* ratios = new double[NumBuckets(max_bits)];
+  double* epochs = new double[NumBuckets(max_bits)];
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
     int buckets = NumBuckets(bits);
     int bi = (bits - min_bits) / BIT_STEP; 
@@ -74,16 +75,20 @@ int main(int argc, const char* argv[]) {
       cout << "# num_epochs=" << engines[ei].num_epochs() << endl;
       cout << "# dirty_rate="
           << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
-      stats_visitors[bi][ei].FillDirtyRatios(results, buckets);
+      cout << "# CDF of dirty ratios, Average number of epochs/page" << endl;
+      stats_visitors[bi][ei].FillDirtyRatios(ratios, buckets);
+      stats_visitors[bi][ei].FillPageStats(epochs, buckets);
       double left_sum = 0;
       cout << 0 << '\t' << left_sum << endl;
       for (int i = 0; i < buckets; ++i) {
-        left_sum += results[i];
-        cout << (double)(i + 1) / buckets << '\t' << left_sum << endl;
+        left_sum += ratios[i];
+        cout << (double)(i + 1) / buckets << '\t' << left_sum
+            << '\t' << epochs[i] << endl;
       }
     }
   }
 
-  delete[] results;
+  delete[] ratios;
+  delete[] epochs;
   return 0;
 }

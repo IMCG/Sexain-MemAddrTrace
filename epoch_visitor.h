@@ -131,7 +131,6 @@ void PageStatsVisitor::Visit(const BlockSet& blocks) {
 
 int PageStatsVisitor::FillPageStats(double avg_epochs[], const int n) {
   assert(page_blocks() % n == 0);
-  for (int i = 0; i < n; ++i) avg_epochs[i] = 0;
 
   std::vector<double> sum_epochs(n, 0.0);
   std::vector<int> num_pages(n, 0);
@@ -145,12 +144,15 @@ int PageStatsVisitor::FillPageStats(double avg_epochs[], const int n) {
     num_pages[bi] += 1;
   }
 
-  for (int i = 0; i < page_blocks(); ++i) {
-    avg_epochs[i / unit] += sum_epochs[i] / num_pages[i];
+  for (int i = 0; i < n; ++i) {
+    if (num_pages[i]) {
+      avg_epochs[i] = sum_epochs[i] / num_pages[i];
+    } else avg_epochs[i] = 0.0;
   }
 
   for (int i = 0; i < n; ++i) {
-    assert(1 <= avg_epochs[i] && avg_epochs[i] <= num_visits());
+    assert(avg_epochs[i] == 0.0 ||
+        (1 <= avg_epochs[i] && avg_epochs[i] <= num_visits()));
   }
   return num_visits();
 }
