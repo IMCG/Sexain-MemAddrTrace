@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include "mem_addr_parser.h"
+#include "epoch_visitor.h"
 #include "epoch_engine.h"
 
 #define INS_BASE 10
@@ -39,16 +40,16 @@ int main(int argc, const char* argv[]) {
     engines.push_back(ins);
   }
 
-  vector< vector<DirtyRatioVisitor> > dr_visitors;
+  vector< vector<PageStatsVisitor> > stats_visitors;
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
-    dr_visitors.push_back(vector<DirtyRatioVisitor>(engines.size(), bits));
+    stats_visitors.push_back(vector<PageStatsVisitor>(engines.size(), bits));
   }
 
   vector<BlockCountVisitor> bc_visitors(engines.size());
 
   // Register visitors after they are stably allocated.
-  for (vector< vector<DirtyRatioVisitor> >::iterator it = dr_visitors.begin();
-      it != dr_visitors.end(); ++it) {
+  for (vector< vector<PageStatsVisitor> >::iterator it = stats_visitors.begin();
+      it != stats_visitors.end(); ++it) {
     for (unsigned int i = 0; i < engines.size(); ++i) {
       engines[i].AddVisitor(&(*it)[i]);
     }
@@ -73,7 +74,7 @@ int main(int argc, const char* argv[]) {
       cout << "# num_epochs=" << engines[ei].num_epochs() << endl;
       cout << "# dirty_rate="
           << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
-      dr_visitors[bi][ei].FillDirtyRatios(results, buckets);
+      stats_visitors[bi][ei].FillDirtyRatios(results, buckets);
       double left_sum = 0;
       cout << 0 << '\t' << left_sum << endl;
       for (int i = 0; i < buckets; ++i) {

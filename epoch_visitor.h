@@ -48,19 +48,25 @@ class DirtyRatioVisitor : public PageVisitor {
   int FillDirtyRatios(double percents[], const int num_buckets);
  protected:
   typedef std::unordered_map<uint64_t, int> PageDirts;
-  PageDirts page_dirts_;
+  const PageDirts& page_dirts() const { return page_dirts_; }
  private:
+  PageDirts page_dirts_;
   std::vector<double> sum_ratios_;
 };
 
 class PageStatsVisitor : public DirtyRatioVisitor {
  public:
-  PageStatsVisitor(int page_bits);
+  PageStatsVisitor(int page_bits) : DirtyRatioVisitor(page_bits) { }
   void Visit(const BlockSet& blocks);
-  int FillPageStats(int counts[], const int num_buckets);
+  int FillPageStats(double avg_epochs[], const int num_buckets);
  private:
-  struct PageStats { int blocks; int epochs; };
-  std::unordered_map<uint64_t, PageStats> sum_stats_;
+  struct DirtyStats {
+    int blocks;
+    int epochs;
+    DirtyStats() : blocks(0), epochs(0) { }
+  };
+  typedef std::unordered_map<uint64_t, DirtyStats> PageStats;
+  PageStats page_stats_;
 };
 
 // Implementations
@@ -107,6 +113,44 @@ int DirtyRatioVisitor::FillDirtyRatios(double percents[], const int n) {
     for (int i = 0; i < page_blocks(); ++i) {
       percents[i / unit] += sum_ratios_[i] / num_visits();
     }
+  }
+  return num_visits();
+}
+
+// PageStatsVisitor
+
+void PageStatsVisitor::Visit(const BlockSet& blocks) {
+  DirtyRatioVisitor::Visit(blocks);
+  for (PageDirts::const_iterator it = page_dirts().begin();
+      it != page_dirts().end(); ++it) {
+    DirtyStats& stats = page_stats_[it->first];
+    stats.blocks += it->second;
+    stats.epochs += 1;
+  }
+}
+
+int PageStatsVisitor::FillPageStats(double avg_epochs[], const int n) {
+  assert(page_blocks() % n == 0);
+  for (int i = 0; i < n; ++i) avg_epochs[i] = 0;
+
+  std::vector<double> sum_epochs(n, 0.0);
+  std::vector<int> num_pages(n, 0);
+  int unit = page_blocks() / n;
+
+  for (PageStats::iterator it = page_stats_.begin();
+      it != page_stats_.end(); ++it) {
+    DirtyStats& stats = it->second;
+    int bi = (stats.blocks / stats.epochs - 1) / unit;
+    sum_epochs[bi] += stats.epochs;
+    num_pages[bi] += 1;
+  }
+
+  for (int i = 0; i < page_blocks(); ++i) {
+    avg_epochs[i / unit] += sum_epochs[i] / num_pages[i];
+  }
+
+  for (int i = 0; i < n; ++i) {
+    assert(1 <= avg_epochs[i] && avg_epochs[i] <= num_visits());
   }
   return num_visits();
 }
