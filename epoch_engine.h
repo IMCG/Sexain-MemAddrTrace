@@ -38,7 +38,7 @@ void EpochEngine::Input(const MemRecord& rec) {
     }
     epoch_max_ = (rec.ins_seq / epoch_ins() + 1) * epoch_ins();
   }
-  blocks_[rec.mem_addr >> CACHE_BLOCK_BITS] += 1;
+  blocks_.insert(rec.mem_addr >> CACHE_BLOCK_BITS);
 }
 
 bool EpochEngine::DoVisit() {
