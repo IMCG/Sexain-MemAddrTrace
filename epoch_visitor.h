@@ -46,7 +46,7 @@ class EpochDirtVsisitor : public PageVisitor {
  public:
   EpochDirtVsisitor(int page_bits);
   void Visit(const BlockSet& blocks);
-  int FillDirtyRatios(double percents[], const int num_buckets) const;
+  int FillEpochDirts(double dirts[], const int num_buckets) const;
  protected:
   typedef std::unordered_map<uint64_t, int> PageDirts;
   const PageDirts& page_dirts() const { return page_dirts_; }
@@ -70,6 +70,15 @@ class PageStatsVisitor : public EpochDirtVsisitor {
   DirtyStats StatsOf(uint64_t page_i) const;
  private:
   PageStats page_stats_;
+};
+
+class PageDirtVisitor : public PageStatsVisitor {
+ public:
+  PageDirtVisitor(int page_bits) : PageStatsVisitor(page_bits) { }
+  void Visit(const BlockSet& blocks);
+  int FillOverallDirts(double dirts[], const int num_buckets) const;
+ private:
+  BlockSet overall_blocks_;
 };
 
 // Implementations
@@ -108,13 +117,13 @@ void EpochDirtVsisitor::Visit(const BlockSet& blocks) {
   }
 }
 
-int EpochDirtVsisitor::FillDirtyRatios(double percents[], const int n) const {
+int EpochDirtVsisitor::FillEpochDirts(double dirts[], const int n) const {
   assert(page_blocks() % n == 0);
-  for (int i = 0; i < n; ++i) percents[i] = 0.0;
+  for (int i = 0; i < n; ++i) dirts[i] = 0.0;
   if (num_visits()) {
     int unit = page_blocks() / n;
     for (int i = 0; i < page_blocks(); ++i) {
-      percents[i / unit] += sum_ratios_[i] / num_visits();
+      dirts[i / unit] += sum_ratios_[i] / num_visits();
     }
   }
   return num_visits();
@@ -138,10 +147,10 @@ PageStatsVisitor::DirtyStats PageStatsVisitor::StatsOf(uint64_t page_i) const {
   else return DirtyStats();
 }
 
-int PageStatsVisitor::FillPageStats(double avg_epochs[], const int n) const {
+int PageStatsVisitor::FillPageStats(double epochs[], const int n) const {
   assert(page_blocks() % n == 0);
+  for (int i = 0; i < n; ++i) epochs[i] = 0.0;
 
-  std::vector<double> sum_epochs(n, 0.0);
   std::vector<int> num_pages(n, 0);
   int unit = page_blocks() / n;
 
@@ -149,19 +158,56 @@ int PageStatsVisitor::FillPageStats(double avg_epochs[], const int n) const {
       it != page_stats_.end(); ++it) {
     const DirtyStats& stats = it->second;
     int bi = (stats.blocks / stats.epochs - 1) / unit;
-    sum_epochs[bi] += stats.epochs;
+    epochs[bi] += stats.epochs;
     num_pages[bi] += 1;
   }
 
   for (int i = 0; i < n; ++i) {
     if (num_pages[i]) {
-      avg_epochs[i] = sum_epochs[i] / num_pages[i];
-    } else avg_epochs[i] = 0.0;
+      epochs[i] /= num_pages[i];
+    } else epochs[i] = 0.0;
   }
 
   for (int i = 0; i < n; ++i) {
-    assert(avg_epochs[i] == 0.0 ||
-        (1 <= avg_epochs[i] && avg_epochs[i] <= num_visits()));
+    assert(epochs[i] == 0.0 || (1 <= epochs[i] && epochs[i] <= num_visits()));
+  }
+  return num_visits();
+}
+
+// PageDirtVisitor
+
+void PageDirtVisitor::Visit(const BlockSet& blocks) {
+  PageStatsVisitor::Visit(blocks);
+  for (BlockSet::const_iterator it = blocks.begin(); it != blocks.end(); ++it) {
+    overall_blocks_.insert(*it);
+  }
+}
+
+int PageDirtVisitor::FillOverallDirts(double dirts[], const int n) const {
+  assert(page_blocks() % n == 0);
+  for (int i = 0; i < n; ++i) dirts[i] = 0.0;
+
+  PageDirts overall_dirts;
+  for (BlockSet::const_iterator it = overall_blocks_.begin();
+      it != overall_blocks_.end(); ++it) {
+    overall_dirts[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
+  }
+
+  std::vector<int> num_pages(n, 0);
+  int unit = page_blocks() / n;
+  for (PageDirts::const_iterator it = overall_dirts.begin();
+      it != overall_dirts.end(); ++it) {
+    DirtyStats stats = StatsOf(it->first);
+    int bi = (stats.blocks / stats.epochs - 1) / unit;
+    assert(it->second <= page_blocks());
+    dirts[bi] += it->second;
+    num_pages[bi] += 1;
+  }
+
+  for (int i = 0; i < n; ++i) {
+    if (num_pages[i]) {
+      dirts[i] /= num_pages[i];
+    } else dirts[i] = 0.0;
   }
   return num_visits();
 }

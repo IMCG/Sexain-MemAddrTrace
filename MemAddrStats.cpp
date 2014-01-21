@@ -40,15 +40,15 @@ int main(int argc, const char* argv[]) {
     engines.push_back(ins);
   }
 
-  vector< vector<PageStatsVisitor> > stats_visitors;
+  vector< vector<PageDirtVisitor> > stats_visitors;
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
-    stats_visitors.push_back(vector<PageStatsVisitor>(engines.size(), bits));
+    stats_visitors.push_back(vector<PageDirtVisitor>(engines.size(), bits));
   }
 
   vector<BlockCountVisitor> bc_visitors(engines.size());
 
   // Register visitors after they are stably allocated.
-  for (vector< vector<PageStatsVisitor> >::iterator it = stats_visitors.begin();
+  for (vector< vector<PageDirtVisitor> >::iterator it = stats_visitors.begin();
       it != stats_visitors.end(); ++it) {
     for (unsigned int i = 0; i < engines.size(); ++i) {
       engines[i].AddVisitor(&(*it)[i]);
@@ -76,7 +76,7 @@ int main(int argc, const char* argv[]) {
       cout << "# dirty_rate="
           << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
       cout << "# CDF of dirty ratios, Average number of epochs/page" << endl;
-      stats_visitors[bi][ei].FillDirtyRatios(ratios, buckets);
+      stats_visitors[bi][ei].FillEpochDirts(ratios, buckets);
       stats_visitors[bi][ei].FillPageStats(epochs, buckets);
       double left_sum = 0;
       cout << 0 << '\t' << left_sum << endl;
