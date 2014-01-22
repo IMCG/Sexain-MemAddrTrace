@@ -17,7 +17,7 @@ typedef std::unordered_set<uint64_t> BlockSet;
 
 class EpochVisitor {
  public:
-  virtual void Visit(const BlockSet& blocks) = 0;
+  virtual void Visit(const BlockSet& dirty_blocks) = 0;
 };
 
 class BlockCountVisitor : public EpochVisitor {
@@ -32,10 +32,10 @@ class BlockCountVisitor : public EpochVisitor {
 class PageVisitor : public EpochVisitor {
  public:
   PageVisitor(int page_bits);
-  virtual void Visit(const BlockSet& blocks);
+  virtual void Visit(const BlockSet& blocks) { ++num_visits_; }
   int page_bits() const { return page_bits_; }
   int page_blocks() const { return page_blocks_; }
-  int num_visits() const { return num_visits_; }
+  int num_visits() const { assert(num_visits_ >= 0); return num_visits_; }
  private:
   const int page_bits_;
   const int page_blocks_;
@@ -52,14 +52,15 @@ class EpochDirtVsisitor : public PageVisitor {
   const PageDirts& page_dirts() const { return page_dirts_; }
  private:
   PageDirts page_dirts_;
-  std::vector<double> sum_ratios_;
+  std::vector<unsigned int> dirt_pages_;
+  unsigned int page_counts_;
 };
 
 class PageStatsVisitor : public EpochDirtVsisitor {
  public:
   PageStatsVisitor(int page_bits) : EpochDirtVsisitor(page_bits) { }
   void Visit(const BlockSet& blocks);
-  int FillPageStats(double avg_epochs[], const int num_buckets) const;
+  int FillEpochSpans(double avg_epochs[], const int num_buckets) const;
  protected:
   struct DirtyStats {
     int blocks;
@@ -87,43 +88,41 @@ class PageDirtVisitor : public PageStatsVisitor {
 
 PageVisitor::PageVisitor(int page_bits) :
     page_bits_(page_bits), page_blocks_(1 << (page_bits - CACHE_BLOCK_BITS)) {
-  assert(page_blocks_);
+  assert(CACHE_BLOCK_BITS <= page_bits_ && page_bits_ <= 64);
+  assert(page_blocks_ > 0);
   num_visits_ = 0;
-}
-
-void PageVisitor::Visit(const BlockSet& blocks) {
-  ++num_visits_;
 }
 
 // EpochDirtVsisitor
 
 EpochDirtVsisitor::EpochDirtVsisitor(int page_bits) :
-    PageVisitor(page_bits), sum_ratios_(page_blocks(), 0.0) {
+    PageVisitor(page_bits), dirt_pages_(page_blocks(), 0) {
+  page_counts_ = 0;
 }
 
 void EpochDirtVsisitor::Visit(const BlockSet& blocks) {
   PageVisitor::Visit(blocks);
-  // Count how many blocks are dirty in a page
   page_dirts_.clear();
+  // Count how many blocks of a page are dirty within an epoch
   for (BlockSet::const_iterator it = blocks.begin();
       it != blocks.end(); ++it) {
     page_dirts_[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
   }
-  if (page_dirts_.empty()) return;
 
   for (PageDirts::iterator it = page_dirts_.begin();
       it != page_dirts_.end(); ++it) {
-    sum_ratios_[it->second - 1] += (double)1 / page_dirts_.size();
+    dirt_pages_[it->second - 1] += 1;
+    ++page_counts_;
   }
 }
 
-int EpochDirtVsisitor::FillEpochDirts(double dirts[], const int n) const {
+int EpochDirtVsisitor::FillEpochDirts(double ratios[], const int n) const {
   assert(page_blocks() % n == 0);
-  for (int i = 0; i < n; ++i) dirts[i] = 0.0;
-  if (num_visits()) {
+  for (int i = 0; i < n; ++i) ratios[i] = 0.0;
+  if (page_counts_) {
     int unit = page_blocks() / n;
     for (int i = 0; i < page_blocks(); ++i) {
-      dirts[i / unit] += sum_ratios_[i] / num_visits();
+      ratios[i / unit] += (double)dirt_pages_[i] / page_counts_;
     }
   }
   return num_visits();
@@ -147,7 +146,7 @@ PageStatsVisitor::DirtyStats PageStatsVisitor::StatsOf(uint64_t page_i) const {
   else return DirtyStats();
 }
 
-int PageStatsVisitor::FillPageStats(double epochs[], const int n) const {
+int PageStatsVisitor::FillEpochSpans(double epochs[], const int n) const {
   assert(page_blocks() % n == 0);
   for (int i = 0; i < n; ++i) epochs[i] = 0.0;
 
@@ -165,11 +164,8 @@ int PageStatsVisitor::FillPageStats(double epochs[], const int n) const {
   for (int i = 0; i < n; ++i) {
     if (num_pages[i]) {
       epochs[i] /= num_pages[i];
-    } else epochs[i] = 0.0;
-  }
-
-  for (int i = 0; i < n; ++i) {
-    assert(epochs[i] == 0.0 || (1 <= epochs[i] && epochs[i] <= num_visits()));
+      assert(epochs[i] <= num_visits());
+    } else assert(epochs[i] == 0.0);
   }
   return num_visits();
 }
@@ -187,19 +183,18 @@ int PageDirtVisitor::FillOverallDirts(double dirts[], const int n) const {
   assert(page_blocks() % n == 0);
   for (int i = 0; i < n; ++i) dirts[i] = 0.0;
 
-  PageDirts overall_dirts;
+  PageDirts overall_page_dirts;
   for (BlockSet::const_iterator it = overall_blocks_.begin();
       it != overall_blocks_.end(); ++it) {
-    overall_dirts[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
+    overall_page_dirts[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
   }
 
   std::vector<int> num_pages(n, 0);
   int unit = page_blocks() / n;
-  for (PageDirts::const_iterator it = overall_dirts.begin();
-      it != overall_dirts.end(); ++it) {
+  for (PageDirts::const_iterator it = overall_page_dirts.begin();
+      it != overall_page_dirts.end(); ++it) {
     DirtyStats stats = StatsOf(it->first);
     int bi = (stats.blocks / stats.epochs - 1) / unit;
-    assert(it->second <= page_blocks());
     dirts[bi] += it->second;
     num_pages[bi] += 1;
   }
@@ -207,7 +202,8 @@ int PageDirtVisitor::FillOverallDirts(double dirts[], const int n) const {
   for (int i = 0; i < n; ++i) {
     if (num_pages[i]) {
       dirts[i] /= num_pages[i];
-    } else dirts[i] = 0.0;
+      assert(dirts[i] <= page_blocks());
+    } else assert(dirts[i] == 0.0);
   }
   return num_visits();
 }

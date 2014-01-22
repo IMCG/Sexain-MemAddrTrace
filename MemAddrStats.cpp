@@ -29,7 +29,8 @@ int main(int argc, const char* argv[]) {
     return EINVAL;
   }
 
-  MemAddrParser parser(argv[1]);
+  const char* input = argv[1];
+  MemAddrParser parser(input);
   const uint64_t min_ins = atoi(argv[2]) * MEGA;
   const uint64_t max_ins = atoi(argv[3]) * MEGA;
   const int min_bits = atoi(argv[4]);
@@ -40,16 +41,16 @@ int main(int argc, const char* argv[]) {
     engines.push_back(ins);
   }
 
-  vector< vector<PageDirtVisitor> > stats_visitors;
+  vector< vector<PageDirtVisitor> > dirt_visitors;
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
-    stats_visitors.push_back(vector<PageDirtVisitor>(engines.size(), bits));
+    dirt_visitors.push_back(vector<PageDirtVisitor>(engines.size(), bits));
   }
 
   vector<BlockCountVisitor> bc_visitors(engines.size());
 
   // Register visitors after they are stably allocated.
-  for (vector< vector<PageDirtVisitor> >::iterator it = stats_visitors.begin();
-      it != stats_visitors.end(); ++it) {
+  for (vector< vector<PageDirtVisitor> >::iterator it = dirt_visitors.begin();
+      it != dirt_visitors.end(); ++it) {
     for (unsigned int i = 0; i < engines.size(); ++i) {
       engines[i].AddVisitor(&(*it)[i]);
     }
@@ -66,29 +67,38 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  double* ratios = new double[NumBuckets(max_bits)];
+  double* epoch_ratios = new double[NumBuckets(max_bits)];
+  double* overall_ratios = new double[NumBuckets(max_bits)];
   double* epochs = new double[NumBuckets(max_bits)];
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
     int buckets = NumBuckets(bits);
     int bi = (bits - min_bits) / BIT_STEP; 
     for (unsigned int ei = 0; ei < engines.size(); ++ei) {
-      cout << "# num_epochs=" << engines[ei].num_epochs() << endl;
-      cout << "# dirty_rate="
+      dirt_visitors[bi][ei].FillEpochDirts(epoch_ratios, buckets);
+      dirt_visitors[bi][ei].FillOverallDirts(overall_ratios, buckets);
+      dirt_visitors[bi][ei].FillEpochSpans(epochs, buckets);
+
+      string filename(input);
+      filename.append("-").append(to_string(engines[ei].epoch_ins() / MEGA));
+      filename.append("-").append(to_string(bits)).append(".stats");
+      ofstream fout(filename);
+      fout << "# num_epochs=" << engines[ei].num_epochs() << endl;
+      fout << "# dirty_throughput="
           << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
-      cout << "# CDF of dirty ratios, Average number of epochs/page" << endl;
-      stats_visitors[bi][ei].FillEpochDirts(ratios, buckets);
-      stats_visitors[bi][ei].FillPageStats(epochs, buckets);
+      fout << "# Epoch DR, CDF, Overall DR, Epoch Span" << endl;
       double left_sum = 0;
-      cout << 0 << '\t' << left_sum << endl;
+      fout << 0 << '\t' << left_sum << endl;
       for (int i = 0; i < buckets; ++i) {
-        left_sum += ratios[i];
-        cout << (double)(i + 1) / buckets << '\t' << left_sum
-            << '\t' << epochs[i] << endl;
+        left_sum += epoch_ratios[i];
+        fout << (double)(i + 1) / buckets << '\t'
+            << left_sum << '\t'
+            << overall_ratios[i] << '\t'
+            << epochs[i] / engines[ei].num_epochs() << endl;
       }
     }
   }
 
-  delete[] ratios;
+  delete[] epoch_ratios;
   delete[] epochs;
   return 0;
 }
