@@ -11,10 +11,14 @@ gnuplot << EOF
 set terminal postscript eps color
 set output "$file_pre.eps"
 
-set ylabel 'Probability'
-set yrange [0:1]
-set xlabel 'Dirty Proportion'
-set xrange [0:1]
+set style histogram gap 0
+set style data histograms
 
-plot "$file_pre-8.stats" u 1:2 smooth csplines t '256-byte pages'
+set ylabel 'Overall Dirty Ratio'
+set yrange [0:1]
+set xlabel 'Epoch Dirty Ratio'
+set xrange [0:16]
+
+plot "$file_pre.stats" u 3:xticlabels(1) notitle
+
 EOF

@@ -68,14 +68,14 @@ int main(int argc, const char* argv[]) {
   }
 
   double* epoch_ratios = new double[NumBuckets(max_bits)];
-  double* overall_ratios = new double[NumBuckets(max_bits)];
+  double* overall_dirts = new double[NumBuckets(max_bits)];
   double* epochs = new double[NumBuckets(max_bits)];
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
     int buckets = NumBuckets(bits);
     int bi = (bits - min_bits) / BIT_STEP; 
     for (unsigned int ei = 0; ei < engines.size(); ++ei) {
       dirt_visitors[bi][ei].FillEpochDirts(epoch_ratios, buckets);
-      dirt_visitors[bi][ei].FillOverallDirts(overall_ratios, buckets);
+      dirt_visitors[bi][ei].FillOverallDirts(overall_dirts, buckets);
       dirt_visitors[bi][ei].FillEpochSpans(epochs, buckets);
 
       string filename(input);
@@ -87,14 +87,14 @@ int main(int argc, const char* argv[]) {
           << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
       fout << "# Epoch DR, CDF, Overall DR, Epoch Span" << endl;
       double left_sum = 0;
-      fout << 0 << '\t' << left_sum << endl;
       for (int i = 0; i < buckets; ++i) {
-        left_sum += epoch_ratios[i];
-        fout << (double)(i + 1) / buckets << '\t'
+        fout << (double)i / buckets << '\t'
             << left_sum << '\t'
-            << overall_ratios[i] << '\t'
+            << overall_dirts[i] / dirt_visitors[bi][ei].page_blocks() << '\t'
             << epochs[i] / engines[ei].num_epochs() << endl;
+        left_sum += epoch_ratios[i];
       }
+      fout << 1 << '\t' << left_sum << endl;
     }
   }
 
