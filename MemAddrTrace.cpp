@@ -163,14 +163,14 @@ VOID Instruction(INS ins, VOID *v)
 
 VOID Detach(VOID *v)
 {
+    PIN_GetLock(&g_lock, 0);
+    g_mem_trace->Flush();
+    PIN_ReleaseLock(&g_lock); 
     delete g_mem_trace;
 }
 
 VOID Fini(INT32 code, VOID *v)
 {
-    PIN_GetLock(&g_lock, 0);
-    g_mem_trace->Flush();
-    PIN_ReleaseLock(&g_lock);
     Detach(v);
 }
 
