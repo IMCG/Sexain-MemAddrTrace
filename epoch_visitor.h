@@ -20,15 +20,6 @@ class EpochVisitor {
   virtual void Visit(const BlockSet& dirty_blocks) = 0;
 };
 
-class BlockCountVisitor : public EpochVisitor {
- public:
-  BlockCountVisitor() : count_(0) { }
-  void Visit(const BlockSet& blocks) { count_ += blocks.size(); }
-  uint64_t count() const { return count_; }
- private:
-  uint64_t count_;
-};
-
 class PageVisitor : public EpochVisitor {
  public:
   PageVisitor(int page_bits);

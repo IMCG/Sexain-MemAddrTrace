@@ -10,9 +10,8 @@
 #include "epoch_visitor.h"
 #include "epoch_engine.h"
 
-#define INS_BASE 10
+#define INT_BASE 10
 #define BIT_STEP 2
-#define MEGA 1000000
 
 using namespace std;
 
@@ -24,29 +23,27 @@ static inline int NumBuckets(int page_bits) {
 int main(int argc, const char* argv[]) {
   if (argc != 6) {
     cerr << "Usage: " << argv[0]
-        << " FILE MIN_MEGA_INS MAX_MEGA_INS"
+        << " FILE MIN_INTERVAL MAX_INTERVAL"
         << " MIN_PAGE_BITS MAX_PAGE_BITS" << endl;
     return EINVAL;
   }
 
   const char* input = argv[1];
   MemAddrParser parser(input);
-  const uint64_t min_ins = atoi(argv[2]) * MEGA;
-  const uint64_t max_ins = atoi(argv[3]) * MEGA;
+  const uint64_t min_interval = atoi(argv[2]);
+  const uint64_t max_interval = atoi(argv[3]);
   const int min_bits = atoi(argv[4]);
   const int max_bits = atoi(argv[5]);
 
-  vector<EpochEngine> engines;
-  for (uint64_t ins = min_ins; ins <= max_ins; ins *= INS_BASE) {
-    engines.push_back(ins);
+  vector<InsEpochEngine> engines;
+  for (uint64_t i = min_interval; i <= max_interval; i *= INT_BASE) {
+    engines.push_back(i);
   }
 
   vector< vector<PageDirtVisitor> > dirt_visitors;
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
     dirt_visitors.push_back(vector<PageDirtVisitor>(engines.size(), bits));
   }
-
-  vector<BlockCountVisitor> bc_visitors(engines.size());
 
   // Register visitors after they are stably allocated.
   for (vector< vector<PageDirtVisitor> >::iterator it = dirt_visitors.begin();
@@ -55,13 +52,10 @@ int main(int argc, const char* argv[]) {
       engines[i].AddVisitor(&(*it)[i]);
     }
   }
-  for (unsigned int i = 0; i < engines.size(); ++i) {
-    engines[i].AddVisitor(&bc_visitors[i]);
-  }
  
   MemRecord rec;
   while (parser.Next(&rec)) {
-    for (vector<EpochEngine>::iterator it = engines.begin();
+    for (vector<InsEpochEngine>::iterator it = engines.begin();
         it != engines.end(); ++it) {
       it->Input(rec);
     }
@@ -79,12 +73,13 @@ int main(int argc, const char* argv[]) {
       dirt_visitors[bi][ei].FillEpochSpans(epochs, buckets);
 
       string filename(input);
-      filename.append("-").append(to_string(engines[ei].epoch_ins() / MEGA));
+      filename.append("-").append(to_string(engines[ei].interval()));
       filename.append("-").append(to_string(bits)).append(".stats");
       ofstream fout(filename);
       fout << "# num_epochs=" << engines[ei].num_epochs() << endl;
-      fout << "# dirty_throughput="
-          << (double)bc_visitors[ei].count() / engines[ei].num_epochs() << endl;
+      fout << "# epoch_interval="
+          << (double)engines[ei].interval() / engines[ei].num_epochs()
+          << endl;
       fout << "# Epoch DR, CDF, Overall DR, Epoch Span" << endl;
       double left_sum = 0;
       for (int i = 0; i < buckets; ++i) {
@@ -102,3 +97,4 @@ int main(int argc, const char* argv[]) {
   delete[] epochs;
   return 0;
 }
+
