@@ -49,7 +49,10 @@ class MemAddrParser {
   Bytef* ins_comp_;
   Bytef* addr_comp_;
   Bytef* op_comp_;
-  uint64_t last_ins_; // for sequential check
+
+  uint64_t base_ins_;
+  uint64_t base_step_;
+  uint64_t last_ins_;
 };
 
 MemAddrParser::MemAddrParser(const char* file) {
@@ -70,6 +73,9 @@ MemAddrParser::MemAddrParser(const char* file) {
   op_comp_ = (Bytef*)malloc(compressBound(sizeof(char) * buffer_count()));
   i_next_ = 0;
   i_limit_ = buffer_count();
+
+  base_ins_ = 0;
+  base_step_ = (uint64_t)1 << (sizeof(ins_array_[0]) * 8);
   last_ins_ = 0;
 
   Replenish();
@@ -129,17 +135,18 @@ bool MemAddrParser::Next(MemRecord* rec) {
     return false;
   }
 
-  rec->ins_seq = ins_array_[i_next_];
+  rec->ins_seq = ins_array_[i_next_] + base_ins_;
+  if (rec->ins_seq < last_ins_) {
+    assert(last_ins_ - rec->ins_seq > (base_step_ >> 3));
+    rec->ins_seq += base_step_;
+    base_ins_ += base_step_;
+  }
+  last_ins_ = rec->ins_seq;
+ 
   rec->mem_addr = *((uint64_t*)
       (addr_array_ + ptr_bytes_ * i_next_ / sizeof(char)));
   rec->op = op_array_[i_next_];
   BUG_ON(rec->op != 'R' && rec->op != 'W');
-
-  if (rec->ins_seq < last_ins_) {
-    std::cerr << "[Warn] instruction sequence decreases: "
-        << last_ins_ << '\t' << rec->ins_seq << std::endl;
-  }
-  last_ins_ = rec->ins_seq;
 
 #ifdef STDOUT
   std::cout << rec->ins_seq << '\t' << rec->mem_addr << '\t'
