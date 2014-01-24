@@ -30,13 +30,13 @@ int main(int argc, const char* argv[]) {
 
   const char* input = argv[1];
   MemAddrParser parser(input);
-  const uint64_t min_interval = atoi(argv[2]);
-  const uint64_t max_interval = atoi(argv[3]);
+  const int min_interval = atoi(argv[2]);
+  const int max_interval = atoi(argv[3]);
   const int min_bits = atoi(argv[4]);
   const int max_bits = atoi(argv[5]);
 
   vector<InsEpochEngine> engines;
-  for (uint64_t i = min_interval; i <= max_interval; i *= INT_BASE) {
+  for (int i = min_interval; i <= max_interval; i *= INT_BASE) {
     engines.push_back(i);
   }
 
@@ -78,7 +78,7 @@ int main(int argc, const char* argv[]) {
       ofstream fout(filename);
       fout << "# num_epochs=" << engines[ei].num_epochs() << endl;
       fout << "# epoch_interval="
-          << (double)engines[ei].interval() / engines[ei].num_epochs()
+          << (double)engines[ei].overall_dirts() / engines[ei].num_epochs()
           << endl;
       fout << "# Epoch DR, CDF, Overall DR, Epoch Span" << endl;
       double left_sum = 0;
