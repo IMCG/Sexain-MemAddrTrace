@@ -3,6 +3,7 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -11,7 +12,6 @@
 #include "epoch_engine.h"
 
 #define MEGA 1000000
-#define BIT_STEP 2
 
 using namespace std;
 
@@ -21,31 +21,39 @@ static inline int NumBuckets(int page_bits) {
 }
 
 int main(int argc, const char* argv[]) {
-  if (argc != 6) {
+  if (argc < 6) {
     cerr << "Usage: " << argv[0]
-        << " FILE MIN_INTERVAL MAX_INTERVAL"
-        << " MIN_PAGE_BITS MAX_PAGE_BITS" << endl;
+        << " FILE [-e EPOCH_INTERVAL]... [-p PAGE_BITS]" << endl;
     return EINVAL;
   }
 
   const char* input = argv[1];
-  MemAddrParser parser(input);
-  const int min_interval = atoi(argv[2]);
-  const int max_interval = atoi(argv[3]);
-  const int min_bits = atoi(argv[4]);
-  const int max_bits = atoi(argv[5]);
-
-  vector<DirtEpochEngine> engines;
-  int step = (max_interval - min_interval) / 2;
-  if (step) {
-    for (int i = min_interval; i <= max_interval; i += step) {
-      engines.push_back(i);
+  vector<int> arg_epochs;
+  vector<int> arg_pages;
+  for (int i = 2; i < argc; ++i) {
+    if (strcmp(argv[i], "-e") == 0) {
+      if (++i < argc) arg_epochs.push_back(atoi(argv[i]));
+      else cerr << "[Err] Wrong argument!" << endl;
+    } else if (strcmp(argv[i], "-p") == 0) {
+      if ( ++i < argc) arg_pages.push_back(atoi(argv[i]));
+      else cerr << "[Err] Wrong argument!" << endl;
+    } else {
+      cerr << "[Err] Wrong argument: " << argv[i] << endl;
+      return EINVAL;
     }
-  } else engines.push_back(min_interval);
+  }
+
+  MemAddrParser parser(input);
+  vector<DirtEpochEngine> engines;
+  for (vector<int>::iterator it = arg_epochs.begin();
+      it != arg_epochs.end(); ++it) {
+    engines.push_back(*it);
+  }
 
   vector< vector<PageDirtVisitor> > dirt_visitors;
-  for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
-    dirt_visitors.push_back(vector<PageDirtVisitor>(engines.size(), bits));
+  for (vector<int>::iterator it = arg_pages.begin();
+      it != arg_pages.end(); ++it) {
+    dirt_visitors.push_back(vector<PageDirtVisitor>(engines.size(), *it));
   }
 
   // Register visitors after they are stably allocated.
@@ -64,20 +72,19 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  double* epoch_ratios = new double[NumBuckets(max_bits)];
-  double* overall_dirts = new double[NumBuckets(max_bits)];
-  double* epochs = new double[NumBuckets(max_bits)];
-  for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
-    int buckets = NumBuckets(bits);
-    int bi = (bits - min_bits) / BIT_STEP; 
+  for (unsigned int pi = 0; pi < arg_pages.size(); ++pi) {
+    int buckets = NumBuckets(arg_pages[pi]);
+    vector<double> epoch_ratios(buckets);
+    vector<double> overall_dirts(buckets);
+    vector<double> epochs(buckets);
     for (unsigned int ei = 0; ei < engines.size(); ++ei) {
-      dirt_visitors[bi][ei].FillEpochDirts(epoch_ratios, buckets);
-      dirt_visitors[bi][ei].FillOverallDirts(overall_dirts, buckets);
-      dirt_visitors[bi][ei].FillEpochSpans(epochs, buckets);
+      dirt_visitors[pi][ei].FillEpochDirts(epoch_ratios.data(), buckets);
+      dirt_visitors[pi][ei].FillOverallDirts(overall_dirts.data(), buckets);
+      dirt_visitors[pi][ei].FillEpochSpans(epochs.data(), buckets);
 
       string filename(input);
       filename.append("-").append(to_string(engines[ei].interval()));
-      filename.append("-").append(to_string(bits)).append(".stats");
+      filename.append("-").append(to_string(arg_pages[pi])).append(".stats");
       ofstream fout(filename);
       fout << "# num_epochs=" << engines[ei].num_epochs() << endl;
       fout << "# epoch_interval=" << fixed
@@ -88,7 +95,7 @@ int main(int argc, const char* argv[]) {
       for (int i = 0; i < buckets; ++i) {
         fout << (double)i / buckets << '\t'
             << left_sum << '\t'
-            << overall_dirts[i] / dirt_visitors[bi][ei].page_blocks() << '\t'
+            << overall_dirts[i] / dirt_visitors[pi][ei].page_blocks() << '\t'
             << epochs[i] / engines[ei].num_epochs() << endl;
         left_sum += epoch_ratios[i];
       }
@@ -96,9 +103,6 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  delete[] epoch_ratios;
-  delete[] overall_dirts;
-  delete[] epochs;
   return 0;
 }
 
