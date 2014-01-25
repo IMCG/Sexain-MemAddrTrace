@@ -97,7 +97,8 @@ void EpochDirtVisitor::Visit(const BlockSet& blocks) {
   // Count how many blocks of a page are dirty within an epoch
   for (BlockSet::const_iterator it = blocks.begin();
       it != blocks.end(); ++it) {
-    page_dirts_[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1;
+    assert((page_dirts_[(*it) >> (page_bits() - CACHE_BLOCK_BITS)] += 1)
+        <= page_blocks());
   }
 
   for (PageDirts::iterator it = page_dirts_.begin();

@@ -57,6 +57,7 @@ EpochEngine::EpochEngine(int interval) : interval_(interval) {
 
 bool EpochEngine::Input(const MemRecord& rec) {
   if (rec.op != 'W') return false;
+  assert(rec.ins_seq >= overall_ins_);
   overall_ins_ = rec.ins_seq;
   return true;
 }
@@ -88,7 +89,7 @@ bool DirtEpochEngine::Input(const MemRecord& rec) {
 
 bool InsEpochEngine::Input(const MemRecord& rec) {
   if (!EpochEngine::Input(rec)) return false;
-  if (rec.ins_seq > epoch_max_) {
+  if (overall_ins() > epoch_max_) {
     if (epoch_max_) {
       NextEpoch();
     }

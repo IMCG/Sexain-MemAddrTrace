@@ -10,7 +10,7 @@
 #include "epoch_visitor.h"
 #include "epoch_engine.h"
 
-#define INT_BASE 10
+#define MEGA 1000000
 #define BIT_STEP 2
 
 using namespace std;
@@ -35,10 +35,13 @@ int main(int argc, const char* argv[]) {
   const int min_bits = atoi(argv[4]);
   const int max_bits = atoi(argv[5]);
 
-  vector<InsEpochEngine> engines;
-  for (int i = min_interval; i <= max_interval; i *= INT_BASE) {
-    engines.push_back(i);
-  }
+  vector<DirtEpochEngine> engines;
+  int step = (max_interval - min_interval) / 2;
+  if (step) {
+    for (int i = min_interval; i <= max_interval; i += step) {
+      engines.push_back(i);
+    }
+  } else engines.push_back(min_interval);
 
   vector< vector<PageDirtVisitor> > dirt_visitors;
   for (int bits = min_bits; bits <= max_bits; bits += BIT_STEP) {
@@ -55,7 +58,7 @@ int main(int argc, const char* argv[]) {
  
   MemRecord rec;
   while (parser.Next(&rec)) {
-    for (vector<InsEpochEngine>::iterator it = engines.begin();
+    for (vector<DirtEpochEngine>::iterator it = engines.begin();
         it != engines.end(); ++it) {
       it->Input(rec);
     }
@@ -77,9 +80,9 @@ int main(int argc, const char* argv[]) {
       filename.append("-").append(to_string(bits)).append(".stats");
       ofstream fout(filename);
       fout << "# num_epochs=" << engines[ei].num_epochs() << endl;
-      fout << "# epoch_interval="
-          << (double)engines[ei].overall_dirts() / engines[ei].num_epochs()
-          << endl;
+      fout << "# epoch_interval=" << fixed
+          << (double)engines[ei].overall_ins() / MEGA / engines[ei].num_epochs()
+          << "M" << endl;
       fout << "# Epoch DR, CDF, Overall DR, Epoch Span" << endl;
       double left_sum = 0;
       for (int i = 0; i < buckets; ++i) {
@@ -94,6 +97,7 @@ int main(int argc, const char* argv[]) {
   }
 
   delete[] epoch_ratios;
+  delete[] overall_dirts;
   delete[] epochs;
   return 0;
 }
