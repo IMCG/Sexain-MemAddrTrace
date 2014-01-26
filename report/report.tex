@@ -1,194 +1,23 @@
-\documentclass[12pt]{article}
-\usepackage[landscape]{geometry}
+\documentclass[10pt,a4paper]{article}
+\usepackage{geometry}
 \usepackage{epsfig, subfigure}
 \usepackage{fancyhdr}
+\usepackage{float}
 
 \pagestyle{fancy}
-\pagenumbering{gobble}
 
-\rfoot{Confidential Draft \copyright~Jinglei Ren~$<$jinglei.ren@stanzax.org$>$}
+\rhead{\scriptsize Confidential Draft \copyright~Jinglei Ren~$<$jinglei.ren@stanzax.org$>$}
+\cfoot{}
+\rfoot{\footnotesize \thepage}
+
+\geometry{left=2.5cm,right=2cm,top=3cm,bottom=2cm}
 
 \begin{document}
 
-\noindent
-\textbf{CDF of Epoch Dirty Proportion of Pages}
+\textbf{\large Epoch Dirty Ratios of Pages}
 
-\noindent
-\textit{Dirty proportion} of a page is the number of dirty cache blocks divided by the total number of cache blocks within the page. \textit{IPE} is the number of Instructions Per Epoch. \textit{DR}, or Dirty Rate, is the total number of dirty cache blocks in all pages during an epoch. In a figure, different curves correspond to different page sizes. ``k'', ``m'' and ``b'' stand for thousand(s), million(s) and billion(s), respectively.
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=1m DR=690.528] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-item-create-1000000.eps}
-  \label{fig-tpcc-item-create-1000000}
-}
-\subfigure[IPE=10m DR=1399.15] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-item-create-10000000.eps}
-  \label{fig-tpcc-item-create-10000000}
-}
-\subfigure[IPE=100m DR=4175.7] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-item-create-100000000.eps}
-  \label{fig-tpcc-item-create-100000000}
-}
-\subfigure[IPE=1b DR=20667] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-item-create-1000000000.eps}
-  \label{fig-tpcc-item-create-1000000000}
-}
-\caption{TPCC creating items. Collected while TPCC populates the item table.}
-\end{figure}
-
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=1m DR=1344.67] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-order-create-1000000.eps}
-  \label{fig-tpcc-order-create-1000000}
-}
-\subfigure[IPE=10m DR=2867.14] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-order-create-10000000.eps}
-  \label{fig-tpcc-order-create-10000000}
-}
-\subfigure[IPE=100m DR=6330.1] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-order-create-100000000.eps}
-  \label{fig-tpcc-order-create-100000000}
-}
-\subfigure[IPE=1b DR=18068] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-order-create-1000000000.eps}
-  \label{fig-tpcc-order-create-1000000000}
-}
-\caption{TPCC creating orders. Collected while TPCC populates the order table.}
-\end{figure}
-
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=1m DR=1399.3] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-test-1000000.eps}
-  \label{fig-tpcc-test-1000000}
-}
-\subfigure[IPE=10m DR=3830.63] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-test-10000000.eps}
-  \label{fig-tpcc-test-10000000}
-}
-\subfigure[IPE=100m DR=8292.18] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-test-100000000.eps}
-  \label{fig-tpcc-test-100000000}
-}
-\subfigure[IPE=1b DR=21355] {
-  \includegraphics[width=0.225\textwidth]{stat/tpcc-test-1000000000.eps}
-  \label{fig-tpcc-test-1000000000}
-}
-\caption{TPCC in test. Collected while TPCC undergoes test.}
-\end{figure}
-
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=100k DR=268.656] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-load-a-100000.eps}
-  \label{fig-redis-load-a-10000}
-}
-\subfigure[IPE=1m DR=1647.05] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-load-a-1000000.eps}
-  \label{fig-redis-load-a-1000000}
-}
-\subfigure[IPE=10m DR=14226.8] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-load-a-10000000.eps}
-  \label{fig-redis-load-a-10000000}
-}
-\subfigure[IPE=100m DR=124037] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-load-a-100000000.eps}
-  \label{fig-redis-load-a-100000000}
-}
-\caption{YCSB loading workload records. It inserts 10,000 records into Redis.}
-\end{figure}
-
-\iffalse
-\begin{figure}[h]
-\centering
-\subfigure[IPE=100k DR=1351.39] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-saving-100000.eps}
-  \label{fig-redis-saving-10000}
-}
-\subfigure[IPE=1m DR=3505.31] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-saving-1000000.eps}
-  \label{fig-redis-saving-1000000}
-}
-\subfigure[IPE=10m DR=3842] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-saving-10000000.eps}
-  \label{fig-redis-saving-10000000}
-}
-\subfigure[IPE=100m DR=4064.75] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-saving-100000000.eps}
-  \label{fig-redis-saving-100000000}
-}
-\caption{Redis saving process that dumps memory data into the disk.}
-\end{figure}
-\fi
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=100k DR=232.678] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-c-100000.eps}
-  \label{fig-redis-run-c-10000}
-}
-\subfigure[IPE=1m DR=388.216] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-c-1000000.eps}
-  \label{fig-redis-run-c-1000000}
-}
-\subfigure[IPE=10m DR=947.462] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-c-10000000.eps}
-  \label{fig-redis-run-c-10000000}
-}
-\subfigure[IPE=100m DR=1576] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-c-100000000.eps}
-  \label{fig-redis-run-c-100000000}
-}
-\caption{YCSB Workload C. This workload consists of only read requests.}
-\end{figure}
-
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=100k DR=252.797] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-d-100000.eps}
-  \label{fig-redis-run-d-10000}
-}
-\subfigure[IPE=1m DR=560.55] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-d-1000000.eps}
-  \label{fig-redis-run-d-1000000}
-}
-\subfigure[IPE=10m DR=2004.79] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-d-10000000.eps}
-  \label{fig-redis-run-d-10000000}
-}
-\subfigure[IPE=100m DR=3377] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-d-100000000.eps}
-  \label{fig-redis-run-d-100000000}
-}
-\caption{YCSB Workload D. This workload inserts new records, and read the most recently inserted records. This behaviour simulates user status updates, where people usually only care the latest.}
-\end{figure}
-
-
-\begin{figure}[h]
-\centering
-\subfigure[IPE=100k DR=246.841] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-f-100000.eps}
-  \label{fig-redis-run-f-10000}
-}
-\subfigure[IPE=1m DR=583.358] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-f-1000000.eps}
-  \label{fig-redis-run-f-1000000}
-}
-\subfigure[IPE=10m DR=2561.33] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-f-10000000.eps}
-  \label{fig-redis-run-f-10000000}
-}
-\subfigure[IPE=100m DR=13580] {
-  \includegraphics[width=0.225\textwidth]{stat/redis-run-f-100000000.eps}
-  \label{fig-redis-run-f-100000000}
-}
-\caption{YCSB Workload F. This workload reads a record, modifies it, and writes it back. It simulates the typical behaviour of an user database.}
-\end{figure}
+\input{tpcc}
+\input{ycsb}
+\input{cpu2006}
 
 \end{document}
