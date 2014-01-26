@@ -35,7 +35,7 @@ int main(int argc, const char* argv[]) {
       if (++i < argc) arg_epochs.push_back(atoi(argv[i]));
       else cerr << "[Err] Wrong argument!" << endl;
     } else if (strcmp(argv[i], "-p") == 0) {
-      if ( ++i < argc) arg_pages.push_back(atoi(argv[i]));
+      if (++i < argc) arg_pages.push_back(atoi(argv[i]));
       else cerr << "[Err] Wrong argument!" << endl;
     } else {
       cerr << "[Err] Wrong argument: " << argv[i] << endl;
@@ -72,6 +72,11 @@ int main(int argc, const char* argv[]) {
     }
   }
 
+  for (vector<DirtEpochEngine>::iterator it = engines.begin();
+      it != engines.end(); ++it) {
+    if (it->num_epochs() == 0) it->NewEpoch();
+  }
+ 
   for (unsigned int pi = 0; pi < arg_pages.size(); ++pi) {
     int buckets = NumBuckets(arg_pages[pi]);
     vector<double> epoch_ratios(buckets);

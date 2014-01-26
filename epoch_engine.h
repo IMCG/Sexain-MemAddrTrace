@@ -18,10 +18,10 @@ class EpochEngine {
   int interval() const { return interval_; }
   uint64_t overall_ins() const { return overall_ins_; }
   uint64_t overall_dirts() const { return overall_dirts_; }
+  void NewEpoch();
  protected:
   void DirtyBlock(uint64_t mem_addr);
   int NumBlocks() { return blocks_.size(); }
-  void NextEpoch();
  private:
   std::vector<EpochVisitor*> visitors_;
   BlockSet blocks_;
@@ -66,7 +66,7 @@ void EpochEngine::DirtyBlock(uint64_t mem_addr) {
   blocks_.insert(mem_addr >> CACHE_BLOCK_BITS);
 }
 
-void EpochEngine::NextEpoch() {
+void EpochEngine::NewEpoch() {
   for (std::vector<EpochVisitor*>::iterator it = visitors_.begin();
       it != visitors_.end(); ++it) {
     (*it)->Visit(blocks_);
@@ -80,7 +80,7 @@ void EpochEngine::NextEpoch() {
 
 bool DirtEpochEngine::Input(const MemRecord& rec) {
   if (!EpochEngine::Input(rec)) return false;
-  if (NumBlocks() == interval()) NextEpoch();
+  if (NumBlocks() == interval()) NewEpoch();
   DirtyBlock(rec.mem_addr); 
   return true;
 }
@@ -91,7 +91,7 @@ bool InsEpochEngine::Input(const MemRecord& rec) {
   if (!EpochEngine::Input(rec)) return false;
   if (overall_ins() > epoch_max_) {
     if (epoch_max_) {
-      NextEpoch();
+      NewEpoch();
     }
     epoch_max_ = (rec.ins_seq / interval() + 1) * interval();
   }
