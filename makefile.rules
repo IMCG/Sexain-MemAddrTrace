@@ -82,10 +82,10 @@ PINPLAY_LIBS += -lpinplay -lbz2 -lz
 # This section contains the build rules for all binaries that have special build rules.
 # See makefile.default.rules for the default build rules.
 
-$(OBJDIR)MemAddrTrace$(OBJ_SUFFIX): MemAddrTrace.cpp mem_addr_trace.h
+$(OBJDIR)MemAddrTrace$(OBJ_SUFFIX): MemAddrTrace.cpp mem_addr_trace.h mem_addr_trace.cc
 	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
 
-$(OBJDIR)MemAddrTrace$(PINTOOL_SUFFIX): $(OBJDIR)MemAddrTrace$(OBJ_SUFFIX) mem_addr_trace.h
+$(OBJDIR)MemAddrTrace$(PINTOOL_SUFFIX): $(OBJDIR)MemAddrTrace$(OBJ_SUFFIX)
 	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(PINPLAY_LIBS) $(TOOL_LIBS)
 
 $(OBJDIR)nulltool$(PINTOOL_SUFFIX): $(OBJDIR)nulltool$(OBJ_SUFFIX)

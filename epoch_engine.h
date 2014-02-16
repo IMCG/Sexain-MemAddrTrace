@@ -49,53 +49,29 @@ class InsEpochEngine : public EpochEngine {
 
 // EpochEngine
 
-EpochEngine::EpochEngine(int interval) : interval_(interval) {
+inline EpochEngine::EpochEngine(int interval) : interval_(interval) {
   num_epochs_ = 0;
   overall_ins_ = 0;
   overall_dirts_ = 0;
 }
 
-bool EpochEngine::Input(const MemRecord& rec) {
+inline bool EpochEngine::Input(const MemRecord& rec) {
   if (rec.op != 'W') return false;
   assert(rec.ins_seq >= overall_ins_);
   overall_ins_ = rec.ins_seq;
   return true;
 }
 
-void EpochEngine::DirtyBlock(uint64_t mem_addr) {
+inline void EpochEngine::DirtyBlock(uint64_t mem_addr) {
   blocks_.insert(mem_addr >> CACHE_BLOCK_BITS);
-}
-
-void EpochEngine::NewEpoch() {
-  for (std::vector<EpochVisitor*>::iterator it = visitors_.begin();
-      it != visitors_.end(); ++it) {
-    (*it)->Visit(blocks_);
-  }
-  ++num_epochs_;
-  overall_dirts_ += blocks_.size();
-  blocks_.clear();
 }
 
 // DirtEpochEngine
 
-bool DirtEpochEngine::Input(const MemRecord& rec) {
+inline bool DirtEpochEngine::Input(const MemRecord& rec) {
   if (!EpochEngine::Input(rec)) return false;
   if (NumBlocks() == interval()) NewEpoch();
   DirtyBlock(rec.mem_addr); 
-  return true;
-}
-
-// InsEpochEngine
-
-bool InsEpochEngine::Input(const MemRecord& rec) {
-  if (!EpochEngine::Input(rec)) return false;
-  if (overall_ins() > epoch_max_) {
-    if (epoch_max_) {
-      NewEpoch();
-    }
-    epoch_max_ = (rec.ins_seq / interval() + 1) * interval();
-  }
-  DirtyBlock(rec.mem_addr);
   return true;
 }
 

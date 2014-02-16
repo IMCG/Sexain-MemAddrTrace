@@ -4,5 +4,5 @@ LIBS= -lz
 
 all: MemAddrStats.o
 
-MemAddrStats.o: MemAddrStats.cpp epoch_engine.h epoch_visitor.h mem_addr_parser.h
+MemAddrStats.o: MemAddrStats.cpp epoch_engine.h epoch_engine.cc epoch_visitor.h epoch_visitor.cc mem_addr_parser.h mem_addr_parser.cc
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
