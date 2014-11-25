@@ -13,9 +13,9 @@
 #include <vector>
 #include <algorithm>
 
-template <typename V>
+template <typename T>
 struct IndexNode {
-  V value;
+  T data;
   int prev;
   int next;
 
@@ -23,8 +23,8 @@ struct IndexNode {
     prev = next = -EINVAL;
   }
   
-  IndexNode(V v) : IndexNode() {
-    value = v;
+  IndexNode(T data) : IndexNode() {
+    this->data = data;
   }
 };
 

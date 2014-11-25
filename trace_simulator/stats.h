@@ -12,11 +12,15 @@ static const uint64_t kCacheLineSize = 64; // bytes
 
 class Stats {
  public:
-  Stats(size_t buffer_len, uint64_t block_size, bool has_dram) :
+  Stats(int buffer_len, uint64_t block_size, bool has_dram) :
       buffer_len_(buffer_len), block_size_(block_size), has_dram_(has_dram),
       nvm_through_(0), dram_through_(0), epoch_num_(0) { }
   
-  void OnCopy(int num = 1) {
+  uint64_t nvm_through() const { return nvm_through_; }
+  uint64_t dram_through() const { return dram_through_; }
+  size_t epoch_num() const { return epoch_num_; }
+  
+  void OnCopy(size_t num = 1) {
     if (has_dram_) {
       dram_through_ += block_size_ * num;
     } else {
@@ -32,17 +36,17 @@ class Stats {
     }
   }
   
-  void OnEpoch() {
+  void OnEpoch(size_t num) {
     ++epoch_num_;
     if (has_dram_) {
-      nvm_through_ += buffer_len_ * (block_size_ + kCacheLineSize);
+      nvm_through_ += buffer_len_ * kCacheLineSize + num * block_size_;
     } else {
       nvm_through_ += buffer_len_ * kCacheLineSize;
     }
   }
   
  private:
-  const size_t buffer_len_;
+  const int buffer_len_;
   const uint64_t block_size_;
   const bool has_dram_;
   
