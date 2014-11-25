@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <cassert>
 
 #include "trace_simulator.h"
@@ -33,14 +34,15 @@ int main(int argc, const char * argv[]) {
   
   const char *filename = argv[1];
   const int buf_len = atoi(argv[2]);
-  const long long ins_begin = atoll(argv[3]) * M;
-  const long long ins_num = atoll(argv[4]) * M;
+  const long long ins_begin = atoi(argv[3]) * M;
+  const long long ins_num = atoi(argv[4]) * M;
   
   ifstream fin(filename);
   if (!fin.is_open()) {
     cerr << "Failed to open " << filename << endl;
     return ENFILE;
   }
+  fin >> hex;
   
   vector<TraceSimulator *> simulators;
   for (int i = 3; i < 5; ++i) {
@@ -51,7 +53,7 @@ int main(int argc, const char * argv[]) {
   }
   
   long long ins_total = 0;
-  
+  long long ins_progress = 10 * M;
   while (!fin.eof()) {
     int is_read;
     uint64_t addr;
@@ -60,12 +62,15 @@ int main(int argc, const char * argv[]) {
     fin >> is_read >> addr >> ins_inc;
     
     ins_total += ins_inc;
-    if (is_read) continue;
-    
-    if (ins_total >= ins_begin && ins_total - ins_begin < ins_num) {
-      for (TraceSimulator *ts : simulators) {
-        ts->Put(addr, ins_total - ins_begin);
-      }
+    if (ins_total > ins_progress) {
+      cerr << filename << ": processing " << ins_total / M << " M" << endl;
+      ins_progress += 10 * M;
+    }
+    if (is_read || ins_total < ins_begin) continue;
+    if (ins_total - ins_begin >= ins_num) break;
+
+    for (TraceSimulator *ts : simulators) {
+      ts->Put(addr, ins_total - ins_begin);
     }
   }
   
